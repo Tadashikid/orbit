@@ -318,3 +318,10 @@ def test_rules_read_trips_to_places_without_an_airport():
     assert (trip["kind"], trip["city"]) == ("trip", "Gokarna")
     assert planner.parse("Is there any budget in the calendar?", TODAY)["kind"] == "other"  # never a price search
     assert planner.topics("Is there any budget in the calendar?") == ["calendar", "money"]
+
+
+@pytest.mark.parametrize("question, item", [("How much is an iPhone 16?", "iphone 16"), ("how much does a ps5 cost", "ps5")])
+def test_how_much_questions_are_price_checks(question, item):
+    intent = planner.parse(question, TODAY)
+    assert (intent["kind"], intent["item"]) == ("purchase", item)
+    assert planner.parse("how much did I spend this month", TODAY)["kind"] == "other"  # past spending, not a price

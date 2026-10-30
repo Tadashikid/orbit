@@ -81,6 +81,7 @@ def test_voice_asks_orbit_through_the_browser_and_speaks_the_answer(client, monk
 def test_voice_has_no_tool_that_approves_or_pays():
     assert [main.agent.VOICE_TOOL["name"]] == ["ask_orbit"]
     assert "tap Approve" in main.agent.VOICE
+    assert "Can I buy a table?" in main.agent.VOICE  # purchases go to Orbit, not "I can't check that"
 
 
 def test_voice_needs_the_login_and_a_local_page(client, monkeypatch):

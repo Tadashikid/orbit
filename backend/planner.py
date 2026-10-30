@@ -154,12 +154,15 @@ def parse(question, today):
     if m := re.search(r"(?:₹|rs\.?|inr)\s*([\d,]+)\s*(k)?", q):
         raw["price"] = int(m.group(1).replace(",", "")) * (1000 if m.group(2) else 1)
     # "buy an HP Omen 16-am0076TX", "get a Sony WH-1000XM5", "is an iPhone 17 within my budget", "price of a PS5"
-    item = re.search(r"(?:\b(?:buy|afford|purchase|get|for|order|want|need|spend on|price of|cost of|upgrade to)\s+"
+    # "how much is an iPhone 16", "how much does a PS5 cost" are price questions too
+    item = re.search(r"(?:\b(?:buy|afford|purchase|get|for|order|want|need|spend on|price of|cost of|upgrade to|"
+                     r"how much (?:is|are|does|do|would|will))\s+"
                      r"(?:to (?:buy|get|order|purchase) )?|^(?:is|are) )(?:a |an |the |this |new |my |some )*"
                      r"(?!to\b)([a-z0-9][a-z0-9 +.\-]*?)(?=\s+(?:this|next|within|in|by|for|before|on|at|with|under|from|"
-                     r"worth|affordable|right now|now)\b|[?!,]|\.?$)", q)
+                     r"worth|affordable|right now|now|cost|costs)\b|[?!,]|\.?$)", q)
     raw["item"] = item.group(1).strip(" .-") if item else None
-    bought = re.search(r"\b(buy|afford|purchase|get|order|want|need|spend on|price of|cost of|upgrade to|budget)\b", q)
+    bought = re.search(r"\b(buy|afford|purchase|get|order|want|need|spend on|price of|cost of|upgrade to|budget|"
+                       r"how much (?:is|are|does|do|would|will))\b", q)
     # A bare product name ("hp omen laptop", "iphone 16") must look like one: a model number or a product word.
     # Small talk ("hi", "whats the weather?", "tell me a joke") is never priced.
     if not raw["item"] and len(q.split()) <= 5 and PRODUCTISH.search(q) and not re.search(
