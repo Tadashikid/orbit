@@ -405,3 +405,16 @@ def test_duffel_flight_times_make_the_calendar_event():
     assert (ev["start"], ev["end"]) == ("2026-11-14T06:05:00+05:30", "2026-11-14T07:20:00+05:30")
     assert ev["title"] == "✈ BLR → GOI · British Airways BA123"
     assert notify.event({"kind": "order", "summary": "iPhone", "details": {}}) is None  # a purchase is just the email
+
+
+def test_shopping_cards_link_to_the_store_page_https_only():
+    import store
+
+    hold = {"hold_id": "h1", "kind": "order", "summary": "iPhone 16 from Reliance Digital", "amount": 69900,
+            "expires_at": "2099-01-01T00:00:00+00:00", "details": {"store": "Reliance Digital", "link": "https://www.reliancedigital.in/x"}}
+    a = store.add_action("shop@x.com", "s1", hold)
+    assert (a["store"], a["link"]) == ("Reliance Digital", "https://www.reliancedigital.in/x")
+    sneaky = store.add_action("shop@x.com", "s1", hold | {"details": {"store": "X", "link": "javascript:alert(1)"}})
+    assert "link" not in sneaky  # only a real web page becomes a button
+    stay = store.add_action("shop@x.com", "s1", hold | {"kind": "stay"})
+    assert "link" not in stay

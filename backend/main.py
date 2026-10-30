@@ -539,7 +539,7 @@ async def approve(action_id: str, body: Approval, request: Request):
         raise HTTPException(409, "This hold changed since you saw it. Look at it again before approving.")
     # ponytail: the cap is in rupees, so it skips other currencies; only Duffel TEST fares (GBP/USD) use them today.
     if a["currency"] == "INR" and a["amount"] > MAX_APPROVAL:
-        raise HTTPException(403, f"Over your approval limit of Rs {MAX_APPROVAL:,}. Book this one yourself.")
+        raise HTTPException(403, f"Over your approval limit of Rs {MAX_APPROVAL:,}. Buy it yourself: use the store link on the card.")
     if not store.move(_user(request), action_id, "pending", "approving"):
         raise HTTPException(409, f"This hold is already {a['status']}")
     r = await registry.call("booking__confirm_hold", {"hold_id": a["hold_id"]})

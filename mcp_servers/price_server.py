@@ -154,7 +154,7 @@ async def _live(item):
                 "mrp": round(old) if isinstance(old, (int, float)) and old > price else None,
                 "rating": s.get("rating"), "reviews": s.get("reviews"),
                 "delivery": "; ".join(delivery) if isinstance(delivery, list) else delivery,
-                "link": s.get("product_link") or s.get("link_clean") or s.get("link"),
+                "link": s.get("link_clean") or s.get("link") or s.get("product_link"),  # the store's own page first
                 "used": bool(s.get("second_hand_condition")), "trusted": any(t in store.lower() for t in TRUSTED),
             })
     if listings:

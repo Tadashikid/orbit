@@ -2623,6 +2623,15 @@
   display: flex;
   gap: 8px;
 }
+.approval-store {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  width: fit-content;
+  margin-top: 4px;
+  font-weight: 700;
+  color: var(--forest-800);
+}
 .google-note {
   display: flex;
   gap: 8px;

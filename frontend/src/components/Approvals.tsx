@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BedDouble, Check, Plane, ShieldCheck, ShoppingCart, X } from "lucide-react";
+import { BedDouble, Check, ExternalLink, Plane, ShieldCheck, ShoppingCart, X } from "lucide-react";
 import { api } from "../api";
 import type { Approval } from "../types";
 import { Button, money } from "./ui";
@@ -68,6 +68,11 @@ export default function Approvals({
                   <span className="approval-done">
                     <X size={16} /> {a.status === "declined" ? "Let go" : a.status === "expired" ? "Hold expired" : "Couldn't confirm"}
                   </span>
+                )}
+                {a.link?.startsWith("https://") && (
+                  <a className="approval-store" href={a.link} target="_blank" rel="noopener noreferrer">
+                    Buy at {a.store || "the store"} <ExternalLink size={14} aria-hidden />
+                  </a>
                 )}
                 {errors[a.id] && (
                   <span className="approval-error" role="alert">

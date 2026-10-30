@@ -91,9 +91,12 @@ def move(owner, action_id, frm, to, outcome=None):
 def _action(row):
     action_id, session, hold, digest, status, outcome = row
     h = json.loads(hold)
+    d = h.get("details") or {}
+    # A shopping order's store page: stores have no ordering API, so you buy it there yourself.
+    shop = {"store": d.get("store"), "link": d["link"]} if h["kind"] == "order" and str(d.get("link", "")).startswith("https://") else {}
     return {"id": action_id, "session": session, "hold_id": h["hold_id"], "kind": h["kind"], "summary": h["summary"],
             "amount": h["amount"], "currency": h.get("currency", "INR"), "expires_at": h["expires_at"], "hash": digest,
-            "status": status,
+            "status": status, **shop,
             **({"outcome": json.loads(outcome)} if outcome else {})}
 
 
