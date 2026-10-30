@@ -25,6 +25,7 @@ _OFFSET = int(os.getenv("ORBIT_PORT_OFFSET", "0"))
 SERVERS = {name: f"http://127.0.0.1:{port + _OFFSET}/mcp"
            for name, port in (("calendar", 8101), ("gmail", 8102), ("finance", 8103), ("travel", 8104), ("price", 8105), ("booking", 8106))}
 TIMEOUT_S = 10  # a cold live Gmail fetch takes ~3 s
+SLOW_S = {"booking": 45}  # a Duffel hold is two calls (search fares, create the order): often more than 10 s
 IST = timezone(timedelta(hours=5, minutes=30))
 
 
@@ -88,7 +89,7 @@ class Registry:
             return {**out, "ok": False, "error": f"server '{server}' is not plugged in", "ms": 0}
         start = time.perf_counter()
         try:
-            async with asyncio.timeout(TIMEOUT_S), _session(self.plugged[server]) as s:
+            async with asyncio.timeout(SLOW_S.get(server, TIMEOUT_S)), _session(self.plugged[server]) as s:
                 res = await s.call_tool(tool, args or {})
             text = res.content[0].text if res.content else ""
             out.update(ok=False, error=text) if res.isError else out.update(ok=True, result=json.loads(text))

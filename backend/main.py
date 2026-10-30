@@ -310,7 +310,7 @@ async def _agent_events(goal, history, session=None):
     async def hold(answer):
         """"Book it", done by the rules: hold the exact options the engine priced, each one checked by Guardian.
         Returns (events, a sentence for the reply)."""
-        events, held = [], 0
+        events, held, failed = [], 0, None
         for name, args in _proposals(answer):
             decision, why = guard.check(name, args)
             h = await call(name, args) if decision == "allowed" else {
@@ -319,8 +319,12 @@ async def _agent_events(goal, history, session=None):
             trace.append(row)
             events += [{"type": "tool", **row}, *flush()]
             held += h["ok"]
+            failed = failed or (h["error"] if not h["ok"] and decision == "allowed" else None)
         if held:
-            return events, f" I've put {held} option{'s' if held != 1 else ''} on hold for you to approve."
+            missed = f" One couldn't be held: {failed.rsplit(': ', 1)[-1][:120]}" if failed else ""
+            return events, f" I've put {held} option{'s' if held != 1 else ''} on hold for you to approve.{missed}"
+        if failed:  # Guardian allowed it, the provider said no (no fare to hold, a past date...): say what it said
+            return events, f" Couldn't put it on hold: {failed.rsplit(': ', 1)[-1][:160]}"
         return events, " Nothing was put on hold: Orbit only holds a plan its engine says fits your money."
 
     started, reply, error = False, None, None

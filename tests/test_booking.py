@@ -111,3 +111,19 @@ def test_live_duffel_tokens_are_refused(monkeypatch):
     assert b._duffel_token() is None
     h = b.hold_flight("BLR", "GOI", "2026-11-07", "IndiGo", "21:00", 6411)
     assert h["sandbox"] is True and h["currency"] == "INR"  # the sandbox, never a real ticket
+
+
+def test_a_stale_duffel_fare_falls_through_to_the_next(duffel, monkeypatch):
+    calls, order = duffel
+    fake, tried = b._duffel, []
+
+    def stale_first(method, path, body=None):
+        if path == "/air/orders" and method == "POST":
+            tried.append(body["data"]["selected_offers"][0])
+            if len(tried) == 1:
+                raise ValueError("Duffel: offer_no_longer_available: Please select another offer")
+        return fake(method, path, body)
+
+    monkeypatch.setattr(b, "_duffel", stale_first)
+    h = b.hold_flight("BLR", "GOI", "2026-11-07", "Duffel Airways", "21:00", 6411)
+    assert tried == ["off_same2", "off_same"] and h["details"]["order_id"] == "ord_1"  # cheapest went stale: next one

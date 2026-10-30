@@ -101,10 +101,18 @@ def _duffel_hold(origin, dest, date, airline):
     if not holdable:
         raise ValueError(f"Duffel has no fare from {origin} to {dest} on {date} that can be held. Book it with the airline.")
     same = [o for o in holdable if o["owner"]["name"].lower() == airline.lower()] or holdable
-    offer = min(same, key=lambda o: float(o["total_amount"]))
-    order = _duffel("POST", "/air/orders", {"data": {
-        "type": "hold", "selected_offers": [offer["id"]],
-        "passengers": [{"id": p["id"], **TEST_TRAVELLER} for p in offer["passengers"]]}})
+    # Fares go stale between search and order ("offer_no_longer_available"): try the next cheapest, up to 3.
+    for offer in sorted(same, key=lambda o: float(o["total_amount"]))[:3]:
+        try:
+            order = _duffel("POST", "/air/orders", {"data": {
+                "type": "hold", "selected_offers": [offer["id"]],
+                "passengers": [{"id": p["id"], **TEST_TRAVELLER} for p in offer["passengers"]]}})
+            break
+        except ValueError as e:
+            if "offer_no_longer_available" not in str(e) and "price_changed" not in str(e):
+                raise
+    else:
+        raise ValueError(f"Duffel's fares from {origin} to {dest} on {date} kept selling out. Try again in a minute.")
     owner = offer["owner"]["name"]
     summary = f"{owner} {origin}→{dest} {Date.fromisoformat(date):%a %d %b} · Duffel test"
     return _hold("flight", summary, float(order["total_amount"]), {
