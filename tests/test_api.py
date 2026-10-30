@@ -221,3 +221,9 @@ def test_bookings_window_lists_everything_and_expires_old_holds(client, monkeypa
     statuses = {a["id"]: a["status"] for a in client.get("/actions").json()["actions"]}
     assert {statuses[c["id"]] for c in cards} == {"expired"}
     assert client.post(f"/actions/{cards[0]['id']}/approve", json={"hash": cards[0]["hash"]}).status_code == 409
+
+
+def test_small_talk_reads_nothing_and_says_what_orbit_does(client):
+    d = client.post("/ask", json={"question": "whats the weather?"}).json()
+    assert d["verdict"]["verdict"] == "info" and d["trace"] == []  # no calendar, no Gmail, no prices
+    assert d["verdict"]["headline"].startswith("I can't help with that one.")

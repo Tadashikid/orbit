@@ -451,9 +451,10 @@ async def run_question(question, history=(), explain=True):
         except Exception as e:
             planner_used = f"rules (Gemini unavailable: {str(e)[:120]})"
     intent = intent or planner.parse(question, TODAY)
-    canonical = planner.plan(intent, tools, TODAY)
-    needed = {_key(n, a) for n, a in canonical}
     other = intent["kind"] == "other"
+    # Not a plan: read nothing unless the model picks a tool for it ("what's on my calendar?"). Small talk reads no data.
+    canonical = [] if other else planner.plan(intent, tools, TODAY)
+    needed = {_key(n, a) for n, a in canonical}
 
     def enough(executed):
         return not other and needed <= {_key(f"{r['server']}__{r['tool']}", r["args"]) for r in executed if r["ok"]}
@@ -483,8 +484,9 @@ async def run_question(question, history=(), explain=True):
     verdict = engine.decide(question, intent, results, [s for s in SERVERS if s != "booking"])  # sources, not actions
     explanation = None
     if other:
-        verdict["headline"] = answer or ('I can answer trips, purchases, outings and savings goals. '
-                                         'Try: "Can I buy a laptop this month?"')
+        verdict["headline"] = answer or ("I can't help with that one. I can plan your weekend, check if a trip or a "
+                                         "purchase fits your budget, and hold bookings for your OK. "
+                                         'Try: "Book a Goa trip next weekend".')
     elif model and explain:
         try:
             explanation = await agent.explain(verdict, GEMINI, model)
