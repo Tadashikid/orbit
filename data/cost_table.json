@@ -1,0 +1,22 @@
+{
+  "_note": "Editable user estimates (served by Finance get_cost_table). D sanity-checks against real Goa prices in H0-H1.",
+  "source": "user_estimate",
+  "as_of": "2026-10-08",
+  "currency": "INR",
+  "items": [
+    {"key": "goa_stay_per_night", "label": "Goa stay (per night)", "low": 1200, "high": 3500},
+    {"key": "goa_food_per_day", "label": "Food (per day)", "low": 800, "high": 1500},
+    {"key": "goa_local_transport_per_day", "label": "Scooter / local transport (per day)", "low": 400, "high": 700},
+    {"key": "default_stay_per_night", "label": "Stay (per night), any other city", "low": 1500, "high": 4000},
+    {"key": "default_food_per_day", "label": "Food (per day), any other city", "low": 800, "high": 1500},
+    {"key": "default_local_transport_per_day", "label": "Local transport (per day), any other city", "low": 300, "high": 700},
+    {"key": "abroad_stay_per_night", "label": "Stay (per night), abroad", "low": 3500, "high": 10000},
+    {"key": "abroad_food_per_day", "label": "Food (per day), abroad", "low": 1500, "high": 4000},
+    {"key": "abroad_local_transport_per_day", "label": "Local transport (per day), abroad", "low": 500, "high": 1500},
+    {"key": "fine_dining_per_person", "label": "Fine dining (5-star, per person)", "low": 2500, "high": 6000},
+    {"key": "casual_dining_per_person", "label": "Dinner out (per person)", "low": 600, "high": 1500},
+    {"key": "party_per_person", "label": "Party / club night (per person)", "low": 1500, "high": 3500},
+    {"key": "movie_per_person", "label": "Movie (per person)", "low": 300, "high": 700},
+    {"key": "concert_per_person", "label": "Concert (per person)", "low": 1500, "high": 5000}
+  ]
+}

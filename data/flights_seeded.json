@@ -1,0 +1,27 @@
+{
+  "_note": "SEEDED demo fallback, hand-made. Never label as live. D replaces/augments with a real cached SerpAPI capture (source=cached).",
+  "source": "seeded",
+  "as_of": "2026-10-08T09:00:00+05:30",
+  "routes": {
+    "BLR-GOI-2026-10-10": [
+      {"airline": "IndiGo", "depart": "06:10", "arrive": "07:25", "price": 3899},
+      {"airline": "Air India Express", "depart": "09:30", "arrive": "10:45", "price": 4650},
+      {"airline": "IndiGo", "depart": "18:45", "arrive": "20:00", "price": 6120}
+    ],
+    "GOI-BLR-2026-10-11": [
+      {"airline": "IndiGo", "depart": "21:15", "arrive": "22:30", "price": 4210},
+      {"airline": "Akasa Air", "depart": "17:40", "arrive": "18:55", "price": 5340},
+      {"airline": "Air India Express", "depart": "19:50", "arrive": "21:05", "price": 6880}
+    ],
+    "BLR-GOI-2026-10-17": [
+      {"airline": "IndiGo", "depart": "06:10", "arrive": "07:25", "price": 2999},
+      {"airline": "Akasa Air", "depart": "11:20", "arrive": "12:35", "price": 3450},
+      {"airline": "Air India Express", "depart": "16:05", "arrive": "17:20", "price": 4100}
+    ],
+    "GOI-BLR-2026-10-18": [
+      {"airline": "IndiGo", "depart": "21:15", "arrive": "22:30", "price": 3199},
+      {"airline": "Akasa Air", "depart": "17:40", "arrive": "18:55", "price": 3699},
+      {"airline": "Air India Express", "depart": "19:50", "arrive": "21:05", "price": 4350}
+    ]
+  }
+}

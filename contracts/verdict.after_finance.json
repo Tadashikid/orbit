@@ -1,0 +1,198 @@
+{
+  "question": "Can I afford a Goa trip next weekend?",
+  "verdict": "yes_with_conditions",
+  "headline": "Doable if you skip club nights until payday (Sun 01 Nov). That keeps you above your Rs 10,000 safety cushion.",
+  "numbers": {
+    "balance": 54263,
+    "trip_cost": {
+      "low": 11999,
+      "high": 18232
+    },
+    "monthly_commitments": 15617,
+    "remaining": {
+      "low": 11286,
+      "high": 17519
+    },
+    "safety_floor": 10000,
+    "cash_on_day": 48708,
+    "pay_day": "2026-10-10",
+    "next_salary": "2026-11-01",
+    "math": [
+      {
+        "label": "Balance (as of Thu 08 Oct)",
+        "amount": 54263
+      },
+      {
+        "label": "Rent, bills & SIPs due Fri 09 Oct - Sat 31 Oct",
+        "amount": -5498
+      },
+      {
+        "label": "Everyday spending forecast, 23 days (Fri 09 Oct - Sat 31 Oct)",
+        "amount": -25760
+      },
+      {
+        "label": "Skip club nights, the 23 days left",
+        "amount": 6513
+      },
+      {
+        "label": "Goa (top of Rs 11,999 - Rs 18,232)",
+        "amount": -18232
+      },
+      {
+        "label": "Left on Sat 31 Oct, the day before payday",
+        "amount": 11286
+      }
+    ],
+    "breakdown": [
+      {
+        "key": "flight",
+        "low": 8109,
+        "high": 9990,
+        "source": "seeded",
+        "legs": [
+          {
+            "from": "BLR",
+            "to": "GOI",
+            "date": "2026-10-10",
+            "airline": "IndiGo",
+            "depart": "06:10",
+            "arrive": "07:25",
+            "price": 3899
+          },
+          {
+            "from": "GOI",
+            "to": "BLR",
+            "date": "2026-10-11",
+            "airline": "IndiGo",
+            "depart": "21:15",
+            "arrive": "22:30",
+            "price": 4210
+          }
+        ]
+      },
+      {
+        "key": "stay",
+        "low": 1490,
+        "high": 3842,
+        "nights": 1,
+        "source": "seeded",
+        "per_night": [
+          1490,
+          3842
+        ],
+        "hotel": {
+          "name": "The Byke Retreat - Royal Pearl",
+          "per_night": 1490,
+          "rating": 4.5,
+          "reviews": 2748,
+          "stars": 4,
+          "link": null
+        }
+      },
+      {
+        "key": "other",
+        "low": 2400,
+        "high": 4400,
+        "days": 2,
+        "source": "estimate"
+      }
+    ]
+  },
+  "evidence": [
+    {
+      "server": "calendar",
+      "tool": "find_free_slots",
+      "finding": "Sat 10 Oct - Sun 11 Oct fully free",
+      "as_of": "2026-10-08T09:00:00+05:30",
+      "source": "seeded"
+    },
+    {
+      "server": "calendar",
+      "tool": "list_events",
+      "finding": "4 events read; none during the trip",
+      "as_of": "2026-10-08T09:00:00+05:30",
+      "source": "seeded"
+    },
+    {
+      "server": "gmail",
+      "tool": "list_tasks",
+      "finding": "4 emails with deadlines",
+      "as_of": "2026-10-08T09:00:00+05:30",
+      "source": "seeded"
+    },
+    {
+      "server": "gmail",
+      "tool": "list_tasks",
+      "finding": "1 email contains instructions aimed at the AI - treated as data, not followed",
+      "as_of": "2026-10-08T09:00:00+05:30",
+      "source": "seeded"
+    },
+    {
+      "server": "gmail",
+      "tool": "get_deadlines",
+      "finding": "Q3 quarterly report due Mon 12 Oct 10:00; Book your Tuesday badminton court due Mon 12 Oct 20:00",
+      "as_of": "2026-10-08T09:00:00+05:30",
+      "source": "seeded"
+    },
+    {
+      "server": "travel",
+      "tool": "search_flights",
+      "finding": "BLR-GOI Sat 10 Oct: Rs 3,899 - Rs 6,120 (3 flights); pricing on the 2 within 1.5x of the cheapest",
+      "as_of": "2026-10-08T09:00:00+05:30",
+      "source": "seeded"
+    },
+    {
+      "server": "travel",
+      "tool": "search_flights",
+      "finding": "GOI-BLR Sun 11 Oct: Rs 4,210 - Rs 6,880 (3 flights); pricing on the 2 within 1.5x of the cheapest",
+      "as_of": "2026-10-08T09:00:00+05:30",
+      "source": "seeded"
+    },
+    {
+      "server": "travel",
+      "tool": "search_hotels",
+      "finding": "10 hotels in Goa for Sat 10 Oct - Sun 11 Oct: typical Rs 1,490 - Rs 3,842 a night (2-4 star, hostels left out); e.g. The Byke Retreat - Royal Pearl Rs 1,490, rated 4.5",
+      "as_of": "2026-10-09T03:00:00+05:30",
+      "source": "seeded"
+    },
+    {
+      "server": "finance",
+      "tool": "get_cost_table",
+      "finding": "Food + local transport for 2 days Rs 2,400 - Rs 4,400",
+      "as_of": "2026-10-08",
+      "source": "user_estimate"
+    },
+    {
+      "server": "finance",
+      "tool": "get_balance",
+      "finding": "Balance Rs 54,263 (from your statement, as of 2026-10-08)",
+      "as_of": "2026-10-08",
+      "source": "statement_csv"
+    },
+    {
+      "server": "finance",
+      "tool": "get_spending_summary",
+      "finding": "Forecast: salary, rent, bills and SIPs on their usual days; everyday spending by weekday (Rs 266 on Wednesdays to Rs 2,999 on Sundays). Back-tested on your last 4 weeks: off by ~Rs 755 per 3 days (a flat daily average: ~Rs 1,380)",
+      "as_of": "2026-10-08",
+      "source": "statement_csv"
+    },
+    {
+      "server": "finance",
+      "tool": "get_sips",
+      "finding": "SIPs Rs 5,000/mo (2 funds)",
+      "as_of": "2026-10-08",
+      "source": "statement_csv"
+    }
+  ],
+  "tradeoffs": [
+    "Skip club nights until payday (Sun 01 Nov): saves ~Rs 6,513 (forecast for the 23 days left)",
+    "Still going out before payday: SIP Rs 3,000 (Sat 10 Oct), SIP Rs 2,000 (Thu 15 Oct), phone bill Rs 299 (Thu 15 Oct) and subscription Rs 199 (Tue 20 Oct)",
+    "Book the 06:10 IndiGo out and 21:15 IndiGo back, plus a budget stay: keeps it near Rs 11,999",
+    "Your SIPs (Rs 5,000/mo) stay untouched",
+    "Before you go: Q3 quarterly report (due Mon 12 Oct 10:00)",
+    "Before you go: Book your Tuesday badminton court (due Mon 12 Oct 20:00)"
+  ],
+  "not_read": [
+    "price"
+  ]
+}

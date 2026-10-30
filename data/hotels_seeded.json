@@ -1,0 +1,19 @@
+{
+  "_note": "SEEDED fallback for Travel search_hotels. Captured from Google Hotels (SerpAPI, 2-4 star, hostels left out) on 2026-10-09 for Goa, 10-11 Oct 2026. Never label as live.",
+  "source": "seeded",
+  "as_of": "2026-10-09T03:00:00+05:30",
+  "routes": {
+    "goa-2026-10-10-2026-10-11": [
+      {"name": "Hotel Avisha Residency Vasco", "per_night": 409, "rating": 4.2, "reviews": 212, "stars": 3, "link": null},
+      {"name": "BHAKTI KUTIR", "per_night": 567, "rating": 4.3, "reviews": 300, "stars": 2, "link": null},
+      {"name": "The Byke Retreat - Royal Pearl", "per_night": 1490, "rating": 4.5, "reviews": 2748, "stars": 4, "link": null},
+      {"name": "Rahi De Grand Riviera, Goa", "per_night": 2389, "rating": 3.9, "reviews": 3633, "stars": 3, "link": null},
+      {"name": "Sibaya Beach Resort", "per_night": 3727, "rating": 4.1, "reviews": 1488, "stars": 4, "link": null},
+      {"name": "Dallas Beach Resorts Ashvem Beach North Goa", "per_night": 3956, "rating": 4.4, "reviews": 1428, "stars": 3, "link": null},
+      {"name": "The Acacia Hotel & Spa Goa", "per_night": 4040, "rating": 4.0, "reviews": 3323, "stars": 4, "link": null},
+      {"name": "Fairfield by Marriott Goa Anjuna", "per_night": 6086, "rating": 4.1, "reviews": 3798, "stars": 4, "link": null},
+      {"name": "Fairfield by Marriott Goa Calangute", "per_night": 6800, "rating": 4.1, "reviews": 1995, "stars": 4, "link": null},
+      {"name": "Radisson Hotel Goa Candolim", "per_night": 7560, "rating": 4.3, "reviews": 2372, "stars": 4, "link": null}
+    ]
+  }
+}
