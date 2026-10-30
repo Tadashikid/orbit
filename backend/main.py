@@ -59,7 +59,7 @@ app = FastAPI(title="Orbit")
 registry = Registry(plugged=("calendar", "gmail", "travel", "price", "booking"))  # ponytail: one shared registry = one user (demo)
 
 # Demo login: one account from .env, a signed httpOnly cookie, every other endpoint behind it. No password set = no way in.
-# ponytail: one hard-coded user, no rate limit; swap for real accounts (Google sign-in / Firebase) before sharing a link.
+# ponytail: one hard-coded user, no rate limit: a fallback for offline demos. Google sign-in (below) is the real one.
 DEMO_EMAIL = (os.getenv("ORBIT_DEMO_EMAIL") or "lokihateshulk@gmail.com").strip().lower()
 DEMO_PASSWORD = os.getenv("ORBIT_DEMO_PASSWORD") or ""
 COOKIE = "orbit_session"
@@ -67,7 +67,21 @@ COOKIE = "orbit_session"
 # start, and a new password signs everyone out too.
 BOOT = os.getenv("ORBIT_BOOT") or secrets.token_hex(16)
 _KEY = hashlib.sha256(f"orbit-session:{DEMO_PASSWORD}:{BOOT}".encode()).digest()
-OPEN = {"/login", "/logout", "/me"}
+OPEN = {"/login", "/logout", "/me", "/auth/google", "/auth/config"}
+# Google sign-in (Firebase Auth): the browser signs in with Google, the backend checks Google's signature for this
+# project and sets the same session cookie as the demo login. The project id is public; no secret is needed for this.
+FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID") or ""
+# Until each user has their own data, everyone who signs in shares one statement and one set of bookings: so only
+# these emails may sign in ("*" = any Google account, once data is per user).
+ALLOWED = {e.strip().lower() for e in (os.getenv("ORBIT_ALLOWED_EMAILS") or DEMO_EMAIL).split(",") if e.strip()}
+
+
+def _verify_google(token):
+    """The claims of a Firebase ID token, checked against Google's keys for this project. Raises if it isn't valid."""
+    from google.auth.transport import requests as google_requests
+    from google.oauth2 import id_token
+
+    return id_token.verify_firebase_token(token, google_requests.Request(), audience=FIREBASE_PROJECT_ID)
 
 
 def _signed(email):
@@ -77,7 +91,8 @@ def _signed(email):
 def _user(request: Request):
     value = request.cookies.get(COOKIE, "")
     email = value.rpartition(".")[0]
-    return email if DEMO_PASSWORD and email and hmac.compare_digest(value.encode(), _signed(email).encode()) else None
+    ready = DEMO_PASSWORD or FIREBASE_PROJECT_ID  # no way to sign in set up = no way in
+    return email if ready and email and hmac.compare_digest(value.encode(), _signed(email).encode()) else None
 
 
 @app.middleware("http")
@@ -103,6 +118,33 @@ def login(body: Login, response: Response):
     # No max_age: a session cookie, so closing the browser signs you out too.
     response.set_cookie(COOKIE, _signed(DEMO_EMAIL), httponly=True, samesite="strict")
     return {"email": DEMO_EMAIL}
+
+
+class GoogleSignIn(BaseModel):
+    id_token: str = Field(min_length=20, max_length=5000)
+
+
+@app.get("/auth/config")
+def auth_config():
+    """Which ways to sign in are switched on, for the sign-in page."""
+    return {"google": bool(FIREBASE_PROJECT_ID), "demo": bool(DEMO_PASSWORD)}
+
+
+@app.post("/auth/google")
+def google_sign_in(body: GoogleSignIn, response: Response):
+    if not FIREBASE_PROJECT_ID:
+        raise HTTPException(503, "Google sign-in isn't set up: add FIREBASE_PROJECT_ID to .env")
+    try:
+        claims = _verify_google(body.id_token)
+    except Exception:
+        raise HTTPException(401, "That Google sign-in didn't check out. Try again.") from None
+    email = str(claims.get("email") or "").strip().lower()
+    if not email or not claims.get("email_verified"):
+        raise HTTPException(401, "Google didn't confirm this email address.")
+    if "*" not in ALLOWED and email not in ALLOWED:
+        raise HTTPException(403, f"{email} isn't on Orbit's list yet. Ask the owner to add it to ORBIT_ALLOWED_EMAILS.")
+    response.set_cookie(COOKIE, _signed(email), httponly=True, samesite="strict")  # a session cookie, as above
+    return {"email": email, "name": claims.get("name")}
 
 
 @app.post("/logout")

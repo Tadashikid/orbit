@@ -249,3 +249,32 @@ def test_sign_in_comes_first_after_every_start_and_browser_close(monkeypatch):
     restarted = main.hashlib.sha256(f"orbit-session:{main.DEMO_PASSWORD}:another-start".encode()).digest()
     monkeypatch.setattr(main, "_KEY", restarted)  # the backend started again: a new secret
     assert c.get("/me").status_code == 401  # yesterday's sign-in no longer works: the sign-in page comes first
+
+
+def test_google_sign_in_checks_google_and_the_allow_list(monkeypatch):
+    monkeypatch.setattr(main, "FIREBASE_PROJECT_ID", "orbit-test")
+    monkeypatch.setattr(main, "ALLOWED", {"manu@gmail.com"})
+    tokens = {"good": {"email": "Manu@gmail.com", "email_verified": True, "name": "Manu"},
+              "unverified": {"email": "manu@gmail.com", "email_verified": False},
+              "stranger": {"email": "someone@gmail.com", "email_verified": True}}
+
+    def verify(token):
+        if token not in tokens:
+            raise ValueError("bad signature")
+        return tokens[token]
+
+    monkeypatch.setattr(main, "_verify_google", verify)
+    c = TestClient(main.app)
+    assert c.get("/auth/config").json()["google"] is True
+    sign_in = lambda t: c.post("/auth/google", json={"id_token": t * 5})  # noqa: E731  (min length 20)
+    tokens = {k * 5: v for k, v in tokens.items()}
+    assert sign_in("forged").status_code == 401  # Google's signature didn't check out
+    assert sign_in("unverified").status_code == 401  # Google never confirmed the email
+    assert sign_in("stranger").status_code == 403  # not on the list while data is shared
+    assert c.get("/me").status_code == 401
+    r = sign_in("good")
+    assert r.json() == {"email": "manu@gmail.com", "name": "Manu"} and "httponly" in r.headers["set-cookie"].lower()
+    assert c.get("/me").json() == {"email": "manu@gmail.com"} and c.get("/servers").status_code == 200
+
+    monkeypatch.setattr(main, "ALLOWED", {"*"})  # once each user has their own data: any Google account
+    assert sign_in("stranger").json()["email"] == "someone@gmail.com"
