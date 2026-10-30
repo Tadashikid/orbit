@@ -5,6 +5,15 @@ import type { Approval } from "../types";
 import { Button, money } from "./ui";
 const KIND = { flight: Plane, stay: BedDouble, order: ShoppingCart };
 const time = (iso: string) => new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+const price = (a: Approval) =>
+  !a.currency || a.currency === "INR"
+    ? money(a.amount)
+    : new Intl.NumberFormat("en-GB", { style: "currency", currency: a.currency }).format(a.amount);
+// A Duffel hold can last days: show the date too once it isn't today.
+const until = (iso: string) =>
+  new Date(iso).toDateString() === new Date().toDateString()
+    ? time(iso)
+    : new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 // Holds the agent prepared. Nothing is booked or paid until you press Approve; the AI can't press it for you.
 export default function Approvals({
   items,
@@ -34,7 +43,8 @@ export default function Approvals({
       {!inWindow && <h2>Waiting for your OK</h2>}
       <p className="approvals-note">
         <ShieldCheck size={16} />
-        Orbit put these on hold. Nothing is booked or paid until you approve. Sandbox: no real bookings yet.
+        Orbit put these on hold. Nothing is booked or paid until you approve. Test mode: flights marked “Duffel
+        test” are real Duffel holds paid from a test balance; the rest is a sandbox. No real money moves.
       </p>
       <ul>
         {items.map((a) => {
@@ -45,8 +55,8 @@ export default function Approvals({
               <div className="approval-body">
                 <strong>{a.summary}</strong>
                 <span>
-                  {money(a.amount)}
-                  {a.status === "pending" && ` · held until ${time(a.expires_at)}`}
+                  {price(a)}
+                  {a.status === "pending" && ` · held until ${until(a.expires_at)}`}
                 </span>
                 {a.status === "confirmed" && (
                   <span className="approval-done">

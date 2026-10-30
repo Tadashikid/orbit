@@ -403,7 +403,8 @@ async def approve(action_id: str, body: Approval):
     a = _action_or_404(action_id)
     if not hmac.compare_digest(a["hash"].encode(), body.hash.encode()):
         raise HTTPException(409, "This hold changed since you saw it. Look at it again before approving.")
-    if a["amount"] > MAX_APPROVAL:
+    # ponytail: the cap is in rupees, so it skips other currencies; only Duffel TEST fares (GBP/USD) use them today.
+    if a["currency"] == "INR" and a["amount"] > MAX_APPROVAL:
         raise HTTPException(403, f"Over your approval limit of Rs {MAX_APPROVAL:,}. Book this one yourself.")
     if not store.move(action_id, "pending", "approving"):
         raise HTTPException(409, f"This hold is already {a['status']}")

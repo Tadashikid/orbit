@@ -148,6 +148,7 @@ export interface Approval {
   kind: "flight" | "stay" | "order";
   summary: string;
   amount: number;
+  currency?: string; // "INR" unless a provider prices it otherwise (Duffel test fares: GBP / USD)
   expires_at: string;
   hash: string; // the version you saw; approving sends it back
   status: "pending" | "approving" | "confirmed" | "declined" | "expired" | "failed";
