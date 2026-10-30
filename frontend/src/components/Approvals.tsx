@@ -58,10 +58,11 @@ export default function Approvals({ items, onChange }: { items: Approval[]; onCh
               </div>
               {a.status === "pending" && (
                 <div className="approval-actions">
-                  <Button tone="forest" disabled={busy === a.id} onClick={() => act(a, "approve")}>
+                  <Button tone="forest" aria-label={`Approve ${a.summary}`} disabled={busy === a.id} onClick={() => act(a, "approve")}>
                     Approve
                   </Button>
-                  <Button className="surface-paper" disabled={busy === a.id} onClick={() => act(a, "decline")}>
+                  <Button className="approval-decline" aria-label={`Decline ${a.summary}`} disabled={busy === a.id}
+                    onClick={() => act(a, "decline")}>
                     Decline
                   </Button>
                 </div>

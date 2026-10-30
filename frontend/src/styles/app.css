@@ -2611,3 +2611,17 @@
 .approval-failed {
   opacity: 0.75;
 }
+/* Decline: outlined on paper, dark text (the shared .button is dark green with light text) */
+.approval-actions .approval-decline,
+.approval-actions .approval-decline:hover:not(:disabled) {
+  --surface-primary: var(--on-paper-primary);
+  background: var(--paper);
+  color: var(--on-paper-primary);
+  border: 1px solid var(--forest-800);
+}
+.approval-actions .approval-decline:before {
+  background: var(--mint-100);
+}
+.approval-actions .approval-decline .button-label {
+  color: var(--on-paper-primary);
+}
