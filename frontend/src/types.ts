@@ -154,8 +154,7 @@ export interface Approval {
   store?: string; // shopping orders: where to buy it, and its page (https only)
   link?: string;
   status: "pending" | "approving" | "confirmed" | "declined" | "expired" | "failed";
-  // notice: the confirmation email; alert: the WhatsApp / SMS message
-  outcome?: { reference?: string; payment?: string; error?: string; notice?: string; alert?: string };
+  outcome?: { reference?: string; payment?: string; error?: string; notice?: string }; // notice: the confirmation email
 }
 export interface DecisionResult {
   approvals: Approval[];

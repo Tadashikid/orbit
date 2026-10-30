@@ -8,7 +8,6 @@ WS   /voice                            -> talk to Orbit: mic audio in, spoken re
 GET  /actions                          -> every booking the agent prepared, newest first (expired holds marked)
 POST /actions/{id}/approve {"hash"}    -> confirm a hold the agent prepared (sandbox: nothing is charged)
 POST /actions/{id}/decline             -> let it go
-GET  /me/phone, POST /me/phone {"phone"} -> your number for WhatsApp/SMS booking alerts ("" removes it)
 POST /me/delete                        -> delete my data: conversations, bookings, statement, Google link, my account
 GET  /google/connect, /google/callback -> link your own Google Calendar + Gmail, read-only (backend/google_link.py)
 GET  /google/status, POST /google/disconnect
@@ -47,7 +46,6 @@ from pydantic import BaseModel, Field
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 import agent  # noqa: E402  (reads GEMINI_* from .env)
-import alerts  # noqa: E402
 import engine  # noqa: E402
 import google_link  # noqa: E402
 import guardian  # noqa: E402
@@ -347,29 +345,6 @@ async def unplug(name: str, request: Request):
     return await servers(request)
 
 
-class Phone(BaseModel):
-    phone: str = Field(max_length=30)
-
-
-@app.get("/me/phone")
-def my_phone(request: Request):
-    return {"phone": store.secret(_user(request), "phone"), "alerts": alerts.CHANNEL if alerts.SID else None}
-
-
-@app.post("/me/phone")
-def set_phone(body: Phone, request: Request):
-    """Your number for booking alerts: kept with your account, gone with Delete my data. Empty removes it."""
-    me = _user(request)
-    if not body.phone.strip():
-        store.forget_secret(me, "phone")
-        return my_phone(request)
-    number = alerts.phone(body.phone)
-    if not number:
-        raise HTTPException(422, "That doesn't look like a phone number. Use +91 98450 12345, or 10 digits for India.")
-    store.save_secret(me, "phone", number)
-    return my_phone(request)
-
-
 @app.post("/me/delete")
 async def delete_me(request: Request, response: Response):
     """Delete my data: conversations, booking cards, your statement, your Google link (revoked with Google) and your
@@ -608,9 +583,7 @@ async def approve(action_id: str, body: Approval, request: Request):
         raise HTTPException(409, f"Couldn't confirm it: {r['error'][-120:]}")
     outcome = {k: r["result"].get(k) for k in ("reference", "payment", "confirmed_at")}
     notice = await notify.confirm(_user(request), r["result"], outcome)  # email + calendar event; never fails the booking
-    alert = await alerts.send(store.secret(_user(request), "phone"), alerts.confirmed(a, r["result"]))  # WhatsApp / SMS
-    store.move(_user(request), action_id, "approving", "confirmed",
-               outcome | ({"notice": notice} if notice else {}) | ({"alert": alert} if alert else {}))
+    store.move(_user(request), action_id, "approving", "confirmed", outcome | ({"notice": notice} if notice else {}))
     return _public(store.get_action(_user(request), action_id))
 
 
@@ -622,8 +595,7 @@ async def decline(action_id: str, request: Request):
     await _read(_user(request), "booking__release_hold", {"hold_id": a["hold_id"]})  # best effort: holds expire anyway
     guardian.audit(f"decline: {a['summary']}", [{"server": "booking", "tool": "release_hold", "args": {"hold_id": a["hold_id"]},
                                                  "by": "you", "guardian": "declined by you", "error": None}])
-    alert = await alerts.send(store.secret(_user(request), "phone"), alerts.cancelled(a))  # WhatsApp / SMS
-    return _public(store.get_action(_user(request), action_id)) | ({"outcome": {"alert": alert}} if alert else {})
+    return _public(store.get_action(_user(request), action_id))
 
 
 async def run_question(question, history=(), explain=True, owner=None):
