@@ -14,6 +14,8 @@ export default function SignIn() {
   const [screen, setScreen] = useState<Screen>("in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState(""); // sign-up only, with the password typed twice
+  const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -28,6 +30,7 @@ export default function SignIn() {
     setScreen(next);
     setError("");
     setPassword("");
+    setConfirm("");
   };
   const run = async (attempt: () => Promise<void>) => {
     setBusy(true);
@@ -57,8 +60,10 @@ export default function SignIn() {
   };
   const signUp = (e: FormEvent) => {
     e.preventDefault();
+    if (!name.trim()) return setError("Tell us your name.");
+    if (password !== confirm) return setError("Passwords don't match.");
     void run(async () => {
-      await emailSignUp(email, password);
+      await emailSignUp(name.trim(), email, password);
       go("sent");
     });
   };
@@ -76,6 +81,12 @@ export default function SignIn() {
   );
   const fields = (
     <>
+      {screen === "up" && (
+        <label>
+          Name
+          <input type="text" autoComplete="name" required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />
+        </label>
+      )}
       <label>
         Email
         <input type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -91,6 +102,19 @@ export default function SignIn() {
           onChange={(e) => setPassword(e.target.value)}
         />
       </label>
+      {screen === "up" && (
+        <label>
+          Confirm password
+          <input
+            type="password"
+            autoComplete="new-password"
+            required
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            aria-invalid={confirm !== "" && confirm !== password}
+          />
+        </label>
+      )}
     </>
   );
   return (

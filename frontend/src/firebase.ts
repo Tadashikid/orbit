@@ -38,10 +38,12 @@ export const emailIdToken = (email: string, password: string) =>
     }
     return user.getIdToken();
   });
-// New account: Firebase stores the password (hashed, never here or in Orbit) and emails a verification link.
-export const emailSignUp = (email: string, password: string) =>
+// New account: Firebase stores the password (hashed, never here or in Orbit) and your name (as its display name, like
+// a Google account's), and emails a verification link.
+export const emailSignUp = (name: string, email: string, password: string) =>
   firebase(async (auth, session) => {
     const { user } = await auth.createUserWithEmailAndPassword(session, email, password);
+    await auth.updateProfile(user, { displayName: name });
     await auth.sendEmailVerification(user);
   });
 // Firebase's errors in plain words; null = you closed the Google popup (nothing to say).
