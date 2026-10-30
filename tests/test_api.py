@@ -227,3 +227,14 @@ def test_small_talk_reads_nothing_and_says_what_orbit_does(client):
     d = client.post("/ask", json={"question": "whats the weather?"}).json()
     assert d["verdict"]["verdict"] == "info" and d["trace"] == []  # no calendar, no Gmail, no prices
     assert d["verdict"]["headline"].startswith("I can't help with that one.")
+
+
+@pytest.mark.parametrize("question, reads, says", [
+    ("show me my calendar", {"list_events"}, "Coming up: "),
+    ("any new mails?", {"list_tasks"}, "10 emails need action: Goa weekend pre-approval (due Fri 09 Oct)"),
+    ("Is there any budget in the calendar?", {"list_events"}, "Connect your budget"),  # Finance is off here
+])
+def test_questions_about_your_own_data_read_just_that(client, question, reads, says):
+    d = client.post("/ask", json={"question": question}).json()
+    assert {t["tool"] for t in d["trace"]} == reads and says in d["verdict"]["headline"]
+    assert d["verdict"]["verdict"] == "info"  # an answer, not a plan: no prices were searched

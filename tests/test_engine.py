@@ -311,3 +311,10 @@ def test_every_card_has_its_share_and_they_add_up():
 def test_rules_planner_names_the_exact_item(question, kind, item):
     intent = planner.parse(question, date(2026, 10, 8))
     assert (intent["kind"], intent["item"]) == (kind, item)
+
+
+def test_rules_read_trips_to_places_without_an_airport():
+    trip = planner.parse("Check my budget and calendar for the Gokarna trip.", TODAY)
+    assert (trip["kind"], trip["city"]) == ("trip", "Gokarna")
+    assert planner.parse("Is there any budget in the calendar?", TODAY)["kind"] == "other"  # never a price search
+    assert planner.topics("Is there any budget in the calendar?") == ["calendar", "money"]

@@ -480,8 +480,10 @@ async def run_question(question, history=(), explain=True):
             planner_used = f"rules (Gemini unavailable: {str(e)[:120]})"
     intent = intent or planner.parse(question, TODAY)
     other = intent["kind"] == "other"
-    # Not a plan: read nothing unless the model picks a tool for it ("what's on my calendar?"). Small talk reads no data.
-    canonical = [] if other else planner.plan(intent, tools, TODAY)
+    # Not a plan: read only what the question is about (calendar, mail, money), or nothing at all for small talk.
+    asked_about = planner.topics(question) if other else []
+    canonical = ([c for t in asked_about for c in planner.plan({**intent, "kind": t}, tools, TODAY)] if other
+                 else planner.plan(intent, tools, TODAY))
     needed = {_key(n, a) for n, a in canonical}
 
     def enough(executed):
@@ -512,9 +514,9 @@ async def run_question(question, history=(), explain=True):
     verdict = engine.decide(question, intent, results, [s for s in SERVERS if s != "booking"])  # sources, not actions
     explanation = None
     if other:
-        verdict["headline"] = answer or ("I can't help with that one. I can plan your weekend, check if a trip or a "
-                                         "purchase fits your budget, and hold bookings for your OK. "
-                                         'Try: "Book a Goa trip next weekend".')
+        verdict["headline"] = answer or engine.lookup(asked_about, results, TODAY) or (
+            "I can't help with that one. I can plan your weekend, check if a trip or a purchase fits your budget, "
+            'read your calendar and emails, and hold bookings for your OK. Try: "Book a Goa trip next weekend".')
     elif model and explain:
         try:
             explanation = await agent.explain(verdict, GEMINI, model)

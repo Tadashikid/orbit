@@ -45,7 +45,20 @@ NEEDS = {  # which tools each kind of question reads (the rules planner's knowle
     "purchase": MONEY | {"check_price"},
     "savings_goal": MONEY | {"check_price"},
     "expense": MONEY | {"list_events"},
+    # Not plans: questions about the user's own data, answered straight from it (engine.lookup when no model answers)
+    "calendar": {"list_events"},
+    "mail": {"list_tasks"},
+    "money": {"get_balance", "get_spending_summary"},
 }
+TOPICS = (("calendar", re.compile(r"\b(calendar|schedule|free|busy|events?|meetings?|plans?|what'?s on)\b")),
+          ("mail", re.compile(r"\b(e-?mails?|mails?|inbox|deadlines?|due|tasks?|reminders?)\b")),
+          ("money", re.compile(r"\b(spend|spent|spending|budget|balance|money|expenses?|bills?)\b")))
+
+
+def topics(question):
+    """Which of the user's own data a question that isn't a plan asks about: calendar, mail, money (or none)."""
+    q = question.lower()
+    return [name for name, pattern in TOPICS if pattern.search(q)]
 WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
 NUMBER_WORDS = {w: i for i, w in enumerate(("one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"), 1)}
 
@@ -115,8 +128,12 @@ PRODUCTISH = re.compile(
     r"ps5|xbox|tablet|monitor|keyboard|mouse|chair|table|desk|sofa|bed|mattress|bike|cycle|scooter|car|shoes?|"
     r"sneakers|jacket|bag|fridge|refrigerator|microwave|guitar|apple|samsung|sony|hp|dell|lenovo|asus|acer|oneplus|"
     r"xiaomi|nike|adidas|ikea|bose|jbl|canon|nikon|lg)\b")
-CHAT = re.compile(r"\b(weather|rain|temperature|news|joke|did i|have i|i spent|how much did|am i free|my schedule|"
-                  r"my calendar|deadlines?)\b")
+CHAT = re.compile(r"\b(weather|rain|temperature|news|joke|did i|have i|i spent|how much did|am i free|schedule|"
+                  r"calendar|inbox|e-?mails?|mails?|deadlines?)\b")
+# "a Gokarna trip", "my Coorg getaway": a place the airport table doesn't know is still a trip
+NAMED_TRIP = re.compile(r"\b([a-z]{3,}) (?:trip|getaway|vacation|holiday)\b")
+NOT_TRIP_WORDS = {"the", "this", "that", "next", "road", "day", "weekend", "business", "work", "family", "short",
+                  "quick", "long", "solo", "office", "college", "school", "first", "last", "any"}
 
 
 def parse(question, today):
@@ -128,6 +145,8 @@ def parse(question, today):
                       r"|visit(?:ing)?)\s+(?:the\s+)?([a-z][a-z ]*?)(?=\s+(?:tomorrow|today|tonight|this|next|on|for|in|with|by|"
                       r"from|over|during|and|after|before|trip|soon)\b|[?.!,]|$)", q)
     place = place.group(1) if place and place.group(1) not in NOT_PLACES else None
+    if not place and (named := NAMED_TRIP.search(q)) and named.group(1) not in NOT_PLACES | NOT_TRIP_WORDS | AIRPORTS.keys():
+        place = named.group(1)
     for word, n in NUMBER_WORDS.items():
         q = re.sub(rf"\b{word}\b", str(n), q)
     friends = num(r"with (\d+) (?:other |more )?(?:friends|people|others|of us|colleagues|mates|buddies)")

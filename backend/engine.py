@@ -157,6 +157,31 @@ def _next_salary(after, recurring):
     return after + timedelta(days=31)  # ponytail: no recurring income in the statement -> assume a monthly cycle
 
 
+def lookup(topics, results, today):
+    """A calendar / mail / money question with no model to word it: the facts, read straight from the data."""
+    got = {r["tool"]: r["result"] for r in results if r.get("ok")}
+    said = []
+    if "calendar" in topics and "list_events" in got:
+        events = [e for e in got["list_events"]["events"] if datetime.fromisoformat(e["end"]).date() >= today]
+        said.append("Coming up: " + "; ".join(f"{e['title']} ({_when(e['start'])})" for e in events[:4]) + "."
+                    if events else "Your calendar is clear for the next two weeks.")
+    if "mail" in topics and "list_tasks" in got:
+        due = [t for t in got["list_tasks"]["tasks"] if datetime.fromisoformat(t["deadline"]).date() >= today]
+        said.append(f"{len(due)} email{'s need' if len(due) != 1 else ' needs'} action: " +
+                    "; ".join(f"{t['title'].split(' - ')[0]} (due {_day(datetime.fromisoformat(t['deadline']))})"
+                              for t in due[:4]) + "." if due else "No emails with deadlines coming up.")
+    if "money" in topics:
+        if "get_balance" in got:
+            b, s = got["get_balance"], got.get("get_spending_summary")
+            top = sorted((s or {}).get("monthly_avg_by_category", {}).items(), key=lambda kv: -kv[1])[:3]
+            said.append(f"Your balance is {_rs(b['balance'])} (statement of {b['as_of']})." +
+                        (f" You spend about {_rs(s['monthly_avg_spend'])} a month, most on {_join([k for k, _ in top])}."
+                         if s and top else ""))
+        else:
+            said.append("Connect your budget to see your balance and spending.")
+    return " ".join(said)
+
+
 def decide(question, intent, results, known_servers):
     """intent from planner.validate/parse, results from registry.call, known_servers = every server Orbit knows."""
     kind = intent["kind"]
