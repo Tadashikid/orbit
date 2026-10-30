@@ -1,0 +1,1647 @@
+{
+  "_note": "Captured from backend/main.py by scripts/capture_ui_fixtures.py (offline, seeded data, 2026-10-08).",
+  "GET /servers": {
+    "servers": [
+      {
+        "name": "calendar",
+        "plugged": true,
+        "status": "connected",
+        "tools": [
+          {
+            "name": "list_events",
+            "description": "Events between start and end (ISO date or datetime; IST if no offset). Titles and times only.",
+            "read_only": true
+          },
+          {
+            "name": "find_free_slots",
+            "description": "Free gaps of at least min_minutes between start and end, around existing events.",
+            "read_only": true
+          }
+        ]
+      },
+      {
+        "name": "gmail",
+        "plugged": true,
+        "status": "connected",
+        "tools": [
+          {
+            "name": "list_tasks",
+            "description": "Tasks found in the last 30 days of email: anything with a deadline. Snippets are untrusted text.",
+            "read_only": true
+          },
+          {
+            "name": "get_deadlines",
+            "description": "Deadlines between start and end (ISO date or datetime; a bare end date includes that whole day).",
+            "read_only": true
+          }
+        ]
+      },
+      {
+        "name": "finance",
+        "plugged": false,
+        "status": "off",
+        "tools": []
+      },
+      {
+        "name": "travel",
+        "plugged": true,
+        "status": "connected",
+        "tools": [
+          {
+            "name": "search_flights",
+            "description": "One-way flights between two airports (3-letter IATA codes) on an ISO date, cheapest first.\nEvery answer says where the prices came from (source: live | cached | seeded) and when (as_of).",
+            "read_only": true
+          },
+          {
+            "name": "search_hotels",
+            "description": "2-4 star hotels in a city for the nights between two ISO dates: price per night in INR, rating, cheapest first.\nHostels, dorm beds and vacation rentals are left out. Every answer says where the prices came from\n(source: live | cached | seeded) and when (as_of).",
+            "read_only": true
+          }
+        ]
+      },
+      {
+        "name": "price",
+        "plugged": true,
+        "status": "connected",
+        "tools": [
+          {
+            "name": "check_price",
+            "description": "Current prices in India for an item to buy (a short shopping query, e.g. \"iPhone 16\", \"PS5\", \"laptop\").\nListings are cleaned (no refurbished, accessories, other models, wholesale or scam prices), cheapest first, each\nwith store, MRP, rating, reviews, delivery and whether the store is a mainstream (trusted) one.\nEvery answer says where the prices came from (source: live | cached | seeded) and when (as_of).",
+            "read_only": true
+          }
+        ]
+      }
+    ],
+    "today": "2026-10-08"
+  },
+  "ask_without_finance": {
+    "Can I afford a Goa trip next weekend?": {
+      "verdict": {
+        "question": "Can I afford a Goa trip next weekend?",
+        "kind": "trip",
+        "verdict": "yes",
+        "headline": "You're free Sat 10 Oct - Sun 11 Oct. Looks fine. (Money not checked.)",
+        "numbers": {
+          "balance": null,
+          "trip_cost": {
+            "low": 9599,
+            "high": 13832
+          },
+          "monthly_commitments": null,
+          "remaining": {
+            "low": null,
+            "high": null
+          },
+          "safety_floor": null,
+          "cash_on_day": null,
+          "pay_day": null,
+          "next_salary": null,
+          "math": null,
+          "breakdown": [
+            {
+              "key": "flight",
+              "low": 8109,
+              "high": 9990,
+              "source": "seeded",
+              "legs": [
+                {
+                  "from": "BLR",
+                  "to": "GOI",
+                  "date": "2026-10-10",
+                  "airline": "IndiGo",
+                  "depart": "06:10",
+                  "arrive": "07:25",
+                  "price": 3899
+                },
+                {
+                  "from": "GOI",
+                  "to": "BLR",
+                  "date": "2026-10-11",
+                  "airline": "IndiGo",
+                  "depart": "21:15",
+                  "arrive": "22:30",
+                  "price": 4210
+                }
+              ]
+            },
+            {
+              "key": "stay",
+              "low": 1490,
+              "high": 3842,
+              "nights": 1,
+              "source": "seeded",
+              "per_night": [
+                1490,
+                3842
+              ],
+              "hotel": {
+                "name": "The Byke Retreat - Royal Pearl",
+                "per_night": 1490,
+                "rating": 4.5,
+                "reviews": 2748,
+                "stars": 4,
+                "link": null
+              }
+            },
+            {
+              "key": "other",
+              "low": null,
+              "high": null,
+              "days": 2,
+              "source": null
+            }
+          ]
+        },
+        "evidence": [
+          {
+            "server": "calendar",
+            "tool": "find_free_slots",
+            "finding": "Sat 10 Oct - Sun 11 Oct fully free",
+            "as_of": "2026-10-08T09:00:00+05:30",
+            "source": "seeded"
+          },
+          {
+            "server": "calendar",
+            "tool": "list_events",
+            "finding": "4 events read; none during the trip",
+            "as_of": "2026-10-08T09:00:00+05:30",
+            "source": "seeded"
+          },
+          {
+            "server": "gmail",
+            "tool": "list_tasks",
+            "finding": "4 emails with deadlines",
+            "as_of": "2026-10-08T09:00:00+05:30",
+            "source": "seeded"
+          },
+          {
+            "server": "gmail",
+            "tool": "list_tasks",
+            "finding": "1 email contains instructions aimed at the AI - treated as data, not followed",
+            "as_of": "2026-10-08T09:00:00+05:30",
+            "source": "seeded"
+          },
+          {
+            "server": "gmail",
+            "tool": "get_deadlines",
+            "finding": "Q3 quarterly report due Mon 12 Oct 10:00; Book your Tuesday badminton court due Mon 12 Oct 20:00",
+            "as_of": "2026-10-08T09:00:00+05:30",
+            "source": "seeded"
+          },
+          {
+            "server": "travel",
+            "tool": "search_flights",
+            "finding": "BLR-GOI Sat 10 Oct: Rs 3,899 - Rs 6,120 (3 flights); pricing on the 2 within 1.5x of the cheapest",
+            "as_of": "2026-10-08T09:00:00+05:30",
+            "source": "seeded"
+          },
+          {
+            "server": "travel",
+            "tool": "search_flights",
+            "finding": "GOI-BLR Sun 11 Oct: Rs 4,210 - Rs 6,880 (3 flights); pricing on the 2 within 1.5x of the cheapest",
+            "as_of": "2026-10-08T09:00:00+05:30",
+            "source": "seeded"
+          },
+          {
+            "server": "travel",
+            "tool": "search_hotels",
+            "finding": "10 hotels in Goa for Sat 10 Oct - Sun 11 Oct: typical Rs 1,490 - Rs 3,842 a night (2-4 star, hostels left out); e.g. The Byke Retreat - Royal Pearl Rs 1,490, rated 4.5",
+            "as_of": "2026-10-09T03:00:00+05:30",
+            "source": "seeded"
+          }
+        ],
+        "tradeoffs": [
+          "Before you go: Q3 quarterly report (due Mon 12 Oct 10:00)",
+          "Before you go: Book your Tuesday badminton court (due Mon 12 Oct 20:00)"
+        ],
+        "not_read": [
+          "finance",
+          "price"
+        ]
+      },
+      "explanation": null,
+      "trace": [
+        {
+          "server": "calendar",
+          "tool": "list_events",
+          "args": {
+            "end": "2026-10-12",
+            "start": "2026-10-08"
+          },
+          "ok": true,
+          "ms": 88,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:38.784+05:30"
+        },
+        {
+          "server": "calendar",
+          "tool": "find_free_slots",
+          "args": {
+            "end": "2026-10-12",
+            "min_minutes": 60,
+            "start": "2026-10-08"
+          },
+          "ok": true,
+          "ms": 87,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:38.789+05:30"
+        },
+        {
+          "server": "gmail",
+          "tool": "list_tasks",
+          "args": {},
+          "ok": true,
+          "ms": 88,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:38.793+05:30"
+        },
+        {
+          "server": "gmail",
+          "tool": "get_deadlines",
+          "args": {
+            "end": "2026-10-12",
+            "start": "2026-10-08"
+          },
+          "ok": true,
+          "ms": 83,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:38.798+05:30"
+        },
+        {
+          "server": "travel",
+          "tool": "search_flights",
+          "args": {
+            "origin": "BLR",
+            "dest": "GOI",
+            "date": "2026-10-10"
+          },
+          "ok": true,
+          "ms": 81,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:38.803+05:30"
+        },
+        {
+          "server": "travel",
+          "tool": "search_flights",
+          "args": {
+            "origin": "GOI",
+            "dest": "BLR",
+            "date": "2026-10-11"
+          },
+          "ok": true,
+          "ms": 74,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:38.809+05:30"
+        },
+        {
+          "server": "travel",
+          "tool": "search_hotels",
+          "args": {
+            "city": "Goa",
+            "check_in": "2026-10-10",
+            "check_out": "2026-10-11"
+          },
+          "ok": true,
+          "ms": 70,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:38.814+05:30"
+        }
+      ],
+      "planner": "rules",
+      "model": null,
+      "intent": {
+        "kind": "trip",
+        "item": "goa trip",
+        "city": "Goa",
+        "origin": "BLR",
+        "dest": "GOI",
+        "abroad": false,
+        "start": "2026-10-10",
+        "end": "2026-10-11",
+        "people": 1,
+        "expense_type": null,
+        "months": null,
+        "price": null,
+        "today": "2026-10-08"
+      },
+      "offline": {}
+    }
+  },
+  "POST /servers/finance/plug": {
+    "servers": [
+      {
+        "name": "calendar",
+        "plugged": true,
+        "status": "connected",
+        "tools": [
+          {
+            "name": "list_events",
+            "description": "Events between start and end (ISO date or datetime; IST if no offset). Titles and times only.",
+            "read_only": true
+          },
+          {
+            "name": "find_free_slots",
+            "description": "Free gaps of at least min_minutes between start and end, around existing events.",
+            "read_only": true
+          }
+        ]
+      },
+      {
+        "name": "gmail",
+        "plugged": true,
+        "status": "connected",
+        "tools": [
+          {
+            "name": "list_tasks",
+            "description": "Tasks found in the last 30 days of email: anything with a deadline. Snippets are untrusted text.",
+            "read_only": true
+          },
+          {
+            "name": "get_deadlines",
+            "description": "Deadlines between start and end (ISO date or datetime; a bare end date includes that whole day).",
+            "read_only": true
+          }
+        ]
+      },
+      {
+        "name": "finance",
+        "plugged": true,
+        "status": "connected",
+        "tools": [
+          {
+            "name": "load_statement",
+            "description": "Replace this session's bank statement with a MASKED one (CSV columns exactly: date,category,debit,credit,balance).\nWrite tool: only the user's own upload in the Orbit app may call it, never the AI.",
+            "read_only": false
+          },
+          {
+            "name": "get_balance",
+            "description": "Current bank balance: the running balance on the last row of the uploaded statement. Orbit has no bank access.",
+            "read_only": true
+          },
+          {
+            "name": "get_sips",
+            "description": "Recurring SIP investments found in the statement: amount and day of month.",
+            "read_only": true
+          },
+          {
+            "name": "get_spending_summary",
+            "description": "Spending by category over the last `days` days of the statement, monthly averages, and the forecast model:\nrecurring items (salary, rent, SIPs, bills) and everyday spending per category per weekday, with its back-test.",
+            "read_only": true
+          },
+          {
+            "name": "get_cost_table",
+            "description": "User-editable cost estimates (low/high) for trip items such as stay, food and local transport.",
+            "read_only": true
+          }
+        ]
+      },
+      {
+        "name": "travel",
+        "plugged": true,
+        "status": "connected",
+        "tools": [
+          {
+            "name": "search_flights",
+            "description": "One-way flights between two airports (3-letter IATA codes) on an ISO date, cheapest first.\nEvery answer says where the prices came from (source: live | cached | seeded) and when (as_of).",
+            "read_only": true
+          },
+          {
+            "name": "search_hotels",
+            "description": "2-4 star hotels in a city for the nights between two ISO dates: price per night in INR, rating, cheapest first.\nHostels, dorm beds and vacation rentals are left out. Every answer says where the prices came from\n(source: live | cached | seeded) and when (as_of).",
+            "read_only": true
+          }
+        ]
+      },
+      {
+        "name": "price",
+        "plugged": true,
+        "status": "connected",
+        "tools": [
+          {
+            "name": "check_price",
+            "description": "Current prices in India for an item to buy (a short shopping query, e.g. \"iPhone 16\", \"PS5\", \"laptop\").\nListings are cleaned (no refurbished, accessories, other models, wholesale or scam prices), cheapest first, each\nwith store, MRP, rating, reviews, delivery and whether the store is a mainstream (trusted) one.\nEvery answer says where the prices came from (source: live | cached | seeded) and when (as_of).",
+            "read_only": true
+          }
+        ]
+      }
+    ],
+    "today": "2026-10-08"
+  },
+  "GET /statement (none yet)": null,
+  "GET /statement/samples": {
+    "samples": [
+      "manu_statement",
+      "manu_statement_spend_10k",
+      "manu_statement_spend_15k",
+      "manu_statement_spend_30k",
+      "manu_statement_spend_8k"
+    ]
+  },
+  "POST /statement": {
+    "receipt": {
+      "rows_in": 245,
+      "rows_kept": 245,
+      "rejected": [],
+      "kept_columns": [
+        "date",
+        "category",
+        "debit",
+        "credit",
+        "balance"
+      ],
+      "dropped_columns": [
+        "Narration",
+        "Mode"
+      ],
+      "categorized_by": {
+        "file": 0,
+        "rules": 245
+      },
+      "from": "2026-07-09",
+      "to": "2026-10-08"
+    },
+    "success": true,
+    "rows": 245,
+    "balance": 54263.0,
+    "currency": "INR",
+    "as_of": "2026-10-08",
+    "source": "statement_csv",
+    "from": "2026-07-09",
+    "summary": {
+      "monthly_avg_spend": 43812.42,
+      "monthly_avg_by_category": {
+        "Rent (PG, incl. food)": 9926.09,
+        "Club": 8513.27,
+        "Investments (SIP)": 4963.04,
+        "Dining with friends": 3123.41,
+        "Partying": 2643.65,
+        "Shopping": 2639.68,
+        "Snacks & drinks": 2173.81,
+        "Transport (cab)": 2147.34,
+        "Sports (badminton)": 2005.07,
+        "Games & entertainment": 1336.71,
+        "Transport (metro)": 1308.59,
+        "Food delivery": 1161.35,
+        "Personal care": 820.56,
+        "Health": 437.41,
+        "Subscriptions": 315.65,
+        "Phone": 296.79
+      },
+      "monthly_commitments": 15617.0,
+      "recurring": [
+        {
+          "category": "Income",
+          "day_of_month": 1,
+          "amount": 50000.0,
+          "type": "income"
+        },
+        {
+          "category": "Subscriptions",
+          "day_of_month": 3,
+          "amount": 119.0,
+          "type": "debit"
+        },
+        {
+          "category": "Rent (PG, incl. food)",
+          "day_of_month": 5,
+          "amount": 10000.0,
+          "type": "debit"
+        },
+        {
+          "category": "Investments (SIP)",
+          "day_of_month": 10,
+          "amount": 3000.0,
+          "type": "debit"
+        },
+        {
+          "category": "Investments (SIP)",
+          "day_of_month": 15,
+          "amount": 2000.0,
+          "type": "debit"
+        },
+        {
+          "category": "Phone",
+          "day_of_month": 15,
+          "amount": 299.0,
+          "type": "debit"
+        },
+        {
+          "category": "Subscriptions",
+          "day_of_month": 20,
+          "amount": 199.0,
+          "type": "debit"
+        }
+      ],
+      "forecast": {
+        "method": "your weekday pattern per category x your last 4 weeks",
+        "trained_on": {
+          "from": "2026-07-09",
+          "to": "2026-10-08",
+          "days": 92
+        },
+        "backtest": {
+          "days": 28,
+          "weekday_miss_per_3_days": 755,
+          "weekday_vs_actual_pct": -12.0,
+          "flat_miss_per_3_days": 1380,
+          "flat_vs_actual_pct": -22.5,
+          "chosen": "weekday"
+        }
+      },
+      "as_of": "2026-10-08"
+    }
+  },
+  "GET /statement": {
+    "balance": 54263.0,
+    "currency": "INR",
+    "as_of": "2026-10-08",
+    "source": "statement_csv",
+    "summary": {
+      "monthly_avg_spend": 43812.42,
+      "monthly_avg_by_category": {
+        "Rent (PG, incl. food)": 9926.09,
+        "Club": 8513.27,
+        "Investments (SIP)": 4963.04,
+        "Dining with friends": 3123.41,
+        "Partying": 2643.65,
+        "Shopping": 2639.68,
+        "Snacks & drinks": 2173.81,
+        "Transport (cab)": 2147.34,
+        "Sports (badminton)": 2005.07,
+        "Games & entertainment": 1336.71,
+        "Transport (metro)": 1308.59,
+        "Food delivery": 1161.35,
+        "Personal care": 820.56,
+        "Health": 437.41,
+        "Subscriptions": 315.65,
+        "Phone": 296.79
+      },
+      "monthly_commitments": 15617.0,
+      "recurring": [
+        {
+          "category": "Income",
+          "day_of_month": 1,
+          "amount": 50000.0,
+          "type": "income"
+        },
+        {
+          "category": "Subscriptions",
+          "day_of_month": 3,
+          "amount": 119.0,
+          "type": "debit"
+        },
+        {
+          "category": "Rent (PG, incl. food)",
+          "day_of_month": 5,
+          "amount": 10000.0,
+          "type": "debit"
+        },
+        {
+          "category": "Investments (SIP)",
+          "day_of_month": 10,
+          "amount": 3000.0,
+          "type": "debit"
+        },
+        {
+          "category": "Investments (SIP)",
+          "day_of_month": 15,
+          "amount": 2000.0,
+          "type": "debit"
+        },
+        {
+          "category": "Phone",
+          "day_of_month": 15,
+          "amount": 299.0,
+          "type": "debit"
+        },
+        {
+          "category": "Subscriptions",
+          "day_of_month": 20,
+          "amount": 199.0,
+          "type": "debit"
+        }
+      ],
+      "forecast": {
+        "method": "your weekday pattern per category x your last 4 weeks",
+        "trained_on": {
+          "from": "2026-07-09",
+          "to": "2026-10-08",
+          "days": 92
+        },
+        "backtest": {
+          "days": 28,
+          "weekday_miss_per_3_days": 755,
+          "weekday_vs_actual_pct": -12.0,
+          "flat_miss_per_3_days": 1380,
+          "flat_vs_actual_pct": -22.5,
+          "chosen": "weekday"
+        }
+      },
+      "as_of": "2026-10-08"
+    }
+  },
+  "ask_with_finance": {
+    "Can I afford a Goa trip next weekend?": {
+      "verdict": {
+        "question": "Can I afford a Goa trip next weekend?",
+        "kind": "trip",
+        "verdict": "yes_with_conditions",
+        "headline": "Doable if you skip club nights until payday (Sun 01 Nov). That keeps you above your Rs 10,000 safety cushion.",
+        "numbers": {
+          "balance": 54263,
+          "trip_cost": {
+            "low": 11999,
+            "high": 18232
+          },
+          "monthly_commitments": 15617,
+          "remaining": {
+            "low": 11286,
+            "high": 17519
+          },
+          "safety_floor": 10000,
+          "cash_on_day": 48708,
+          "pay_day": "2026-10-10",
+          "next_salary": "2026-11-01",
+          "math": [
+            {
+              "label": "Balance (as of Thu 08 Oct)",
+              "amount": 54263
+            },
+            {
+              "label": "Rent, bills & SIPs due Fri 09 Oct - Sat 31 Oct",
+              "amount": -5498
+            },
+            {
+              "label": "Everyday spending forecast, 23 days (Fri 09 Oct - Sat 31 Oct)",
+              "amount": -25760
+            },
+            {
+              "label": "Skip club nights, the 23 days left",
+              "amount": 6513
+            },
+            {
+              "label": "Goa (top of Rs 11,999 - Rs 18,232)",
+              "amount": -18232
+            },
+            {
+              "label": "Left on Sat 31 Oct, the day before payday",
+              "amount": 11286
+            }
+          ],
+          "breakdown": [
+            {
+              "key": "flight",
+              "low": 8109,
+              "high": 9990,
+              "source": "seeded",
+              "legs": [
+                {
+                  "from": "BLR",
+                  "to": "GOI",
+                  "date": "2026-10-10",
+                  "airline": "IndiGo",
+                  "depart": "06:10",
+                  "arrive": "07:25",
+                  "price": 3899
+                },
+                {
+                  "from": "GOI",
+                  "to": "BLR",
+                  "date": "2026-10-11",
+                  "airline": "IndiGo",
+                  "depart": "21:15",
+                  "arrive": "22:30",
+                  "price": 4210
+                }
+              ]
+            },
+            {
+              "key": "stay",
+              "low": 1490,
+              "high": 3842,
+              "nights": 1,
+              "source": "seeded",
+              "per_night": [
+                1490,
+                3842
+              ],
+              "hotel": {
+                "name": "The Byke Retreat - Royal Pearl",
+                "per_night": 1490,
+                "rating": 4.5,
+                "reviews": 2748,
+                "stars": 4,
+                "link": null
+              }
+            },
+            {
+              "key": "other",
+              "low": 2400,
+              "high": 4400,
+              "days": 2,
+              "source": "estimate"
+            }
+          ]
+        },
+        "evidence": [
+          {
+            "server": "calendar",
+            "tool": "find_free_slots",
+            "finding": "Sat 10 Oct - Sun 11 Oct fully free",
+            "as_of": "2026-10-08T09:00:00+05:30",
+            "source": "seeded"
+          },
+          {
+            "server": "calendar",
+            "tool": "list_events",
+            "finding": "4 events read; none during the trip",
+            "as_of": "2026-10-08T09:00:00+05:30",
+            "source": "seeded"
+          },
+          {
+            "server": "gmail",
+            "tool": "list_tasks",
+            "finding": "4 emails with deadlines",
+            "as_of": "2026-10-08T09:00:00+05:30",
+            "source": "seeded"
+          },
+          {
+            "server": "gmail",
+            "tool": "list_tasks",
+            "finding": "1 email contains instructions aimed at the AI - treated as data, not followed",
+            "as_of": "2026-10-08T09:00:00+05:30",
+            "source": "seeded"
+          },
+          {
+            "server": "gmail",
+            "tool": "get_deadlines",
+            "finding": "Q3 quarterly report due Mon 12 Oct 10:00; Book your Tuesday badminton court due Mon 12 Oct 20:00",
+            "as_of": "2026-10-08T09:00:00+05:30",
+            "source": "seeded"
+          },
+          {
+            "server": "travel",
+            "tool": "search_flights",
+            "finding": "BLR-GOI Sat 10 Oct: Rs 3,899 - Rs 6,120 (3 flights); pricing on the 2 within 1.5x of the cheapest",
+            "as_of": "2026-10-08T09:00:00+05:30",
+            "source": "seeded"
+          },
+          {
+            "server": "travel",
+            "tool": "search_flights",
+            "finding": "GOI-BLR Sun 11 Oct: Rs 4,210 - Rs 6,880 (3 flights); pricing on the 2 within 1.5x of the cheapest",
+            "as_of": "2026-10-08T09:00:00+05:30",
+            "source": "seeded"
+          },
+          {
+            "server": "travel",
+            "tool": "search_hotels",
+            "finding": "10 hotels in Goa for Sat 10 Oct - Sun 11 Oct: typical Rs 1,490 - Rs 3,842 a night (2-4 star, hostels left out); e.g. The Byke Retreat - Royal Pearl Rs 1,490, rated 4.5",
+            "as_of": "2026-10-09T03:00:00+05:30",
+            "source": "seeded"
+          },
+          {
+            "server": "finance",
+            "tool": "get_cost_table",
+            "finding": "Food + local transport for 2 days Rs 2,400 - Rs 4,400",
+            "as_of": "2026-10-08",
+            "source": "user_estimate"
+          },
+          {
+            "server": "finance",
+            "tool": "get_balance",
+            "finding": "Balance Rs 54,263 (from your statement, as of 2026-10-08)",
+            "as_of": "2026-10-08",
+            "source": "statement_csv"
+          },
+          {
+            "server": "finance",
+            "tool": "get_spending_summary",
+            "finding": "Forecast: salary, rent, bills and SIPs on their usual days; everyday spending by weekday (Rs 266 on Wednesdays to Rs 2,999 on Sundays). Back-tested on your last 4 weeks: off by ~Rs 755 per 3 days (a flat daily average: ~Rs 1,380)",
+            "as_of": "2026-10-08",
+            "source": "statement_csv"
+          },
+          {
+            "server": "finance",
+            "tool": "get_sips",
+            "finding": "SIPs Rs 5,000/mo (2 funds)",
+            "as_of": "2026-10-08",
+            "source": "statement_csv"
+          }
+        ],
+        "tradeoffs": [
+          "Skip club nights until payday (Sun 01 Nov): saves ~Rs 6,513 (forecast for the 23 days left)",
+          "Still going out before payday: SIP Rs 3,000 (Sat 10 Oct), SIP Rs 2,000 (Thu 15 Oct), phone bill Rs 299 (Thu 15 Oct) and subscription Rs 199 (Tue 20 Oct)",
+          "Book the 06:10 IndiGo out and 21:15 IndiGo back, plus a budget stay: keeps it near Rs 11,999",
+          "Your SIPs (Rs 5,000/mo) stay untouched",
+          "Before you go: Q3 quarterly report (due Mon 12 Oct 10:00)",
+          "Before you go: Book your Tuesday badminton court (due Mon 12 Oct 20:00)"
+        ],
+        "not_read": [
+          "price"
+        ]
+      },
+      "explanation": null,
+      "trace": [
+        {
+          "server": "calendar",
+          "tool": "list_events",
+          "args": {
+            "end": "2026-10-12",
+            "start": "2026-10-08"
+          },
+          "ok": true,
+          "ms": 143,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.156+05:30"
+        },
+        {
+          "server": "calendar",
+          "tool": "find_free_slots",
+          "args": {
+            "end": "2026-10-12",
+            "min_minutes": 60,
+            "start": "2026-10-08"
+          },
+          "ok": true,
+          "ms": 138,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.161+05:30"
+        },
+        {
+          "server": "gmail",
+          "tool": "list_tasks",
+          "args": {},
+          "ok": true,
+          "ms": 133,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.166+05:30"
+        },
+        {
+          "server": "gmail",
+          "tool": "get_deadlines",
+          "args": {
+            "end": "2026-10-12",
+            "start": "2026-10-08"
+          },
+          "ok": true,
+          "ms": 129,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.171+05:30"
+        },
+        {
+          "server": "travel",
+          "tool": "search_flights",
+          "args": {
+            "origin": "BLR",
+            "dest": "GOI",
+            "date": "2026-10-10"
+          },
+          "ok": true,
+          "ms": 129,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.176+05:30"
+        },
+        {
+          "server": "travel",
+          "tool": "search_flights",
+          "args": {
+            "origin": "GOI",
+            "dest": "BLR",
+            "date": "2026-10-11"
+          },
+          "ok": true,
+          "ms": 125,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.180+05:30"
+        },
+        {
+          "server": "travel",
+          "tool": "search_hotels",
+          "args": {
+            "city": "Goa",
+            "check_in": "2026-10-10",
+            "check_out": "2026-10-11"
+          },
+          "ok": true,
+          "ms": 120,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.186+05:30"
+        },
+        {
+          "server": "finance",
+          "tool": "get_balance",
+          "args": {},
+          "ok": true,
+          "ms": 117,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.191+05:30"
+        },
+        {
+          "server": "finance",
+          "tool": "get_sips",
+          "args": {},
+          "ok": true,
+          "ms": 113,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.195+05:30"
+        },
+        {
+          "server": "finance",
+          "tool": "get_spending_summary",
+          "args": {
+            "days": 30
+          },
+          "ok": true,
+          "ms": 103,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.204+05:30"
+        },
+        {
+          "server": "finance",
+          "tool": "get_cost_table",
+          "args": {},
+          "ok": true,
+          "ms": 100,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.210+05:30"
+        }
+      ],
+      "planner": "rules",
+      "model": null,
+      "intent": {
+        "kind": "trip",
+        "item": "goa trip",
+        "city": "Goa",
+        "origin": "BLR",
+        "dest": "GOI",
+        "abroad": false,
+        "start": "2026-10-10",
+        "end": "2026-10-11",
+        "people": 1,
+        "expense_type": null,
+        "months": null,
+        "price": null,
+        "today": "2026-10-08"
+      },
+      "offline": {}
+    },
+    "Can I buy a table?": {
+      "verdict": {
+        "question": "Can I buy a table?",
+        "kind": "purchase",
+        "verdict": "yes",
+        "headline": "Yes! Even at your tightest point before payday you'd still have Rs 14,006, above your Rs 10,000 safety cushion.",
+        "numbers": {
+          "balance": 54263,
+          "trip_cost": {
+            "low": 4499,
+            "high": 8999
+          },
+          "monthly_commitments": 15617,
+          "remaining": {
+            "low": 14006,
+            "high": 18506
+          },
+          "safety_floor": 10000,
+          "cash_on_day": 54263,
+          "pay_day": "2026-10-08",
+          "next_salary": "2026-11-01",
+          "math": [
+            {
+              "label": "Balance (as of Thu 08 Oct)",
+              "amount": 54263
+            },
+            {
+              "label": "Rent, bills & SIPs due Fri 09 Oct - Sat 31 Oct",
+              "amount": -5498
+            },
+            {
+              "label": "Everyday spending forecast, 23 days (Fri 09 Oct - Sat 31 Oct)",
+              "amount": -25760
+            },
+            {
+              "label": "Table (top of Rs 4,499 - Rs 8,999)",
+              "amount": -8999
+            },
+            {
+              "label": "Left on Sat 31 Oct, the day before payday",
+              "amount": 14006
+            }
+          ],
+          "breakdown": [
+            {
+              "key": "product",
+              "low": 4499,
+              "high": 8999,
+              "source": "seeded",
+              "offers": [
+                {
+                  "title": "Engineered-wood study table",
+                  "store": "Seeded Store A",
+                  "price": 4499,
+                  "mrp": null,
+                  "rating": null,
+                  "reviews": null,
+                  "link": null
+                },
+                {
+                  "title": "Solid-wood study table",
+                  "store": "Seeded Store B",
+                  "price": 8999,
+                  "mrp": null,
+                  "rating": null,
+                  "reviews": null,
+                  "link": null
+                }
+              ]
+            }
+          ]
+        },
+        "evidence": [
+          {
+            "server": "gmail",
+            "tool": "list_tasks",
+            "finding": "4 emails with deadlines",
+            "as_of": "2026-10-08T09:00:00+05:30",
+            "source": "seeded"
+          },
+          {
+            "server": "gmail",
+            "tool": "list_tasks",
+            "finding": "1 email contains instructions aimed at the AI - treated as data, not followed",
+            "as_of": "2026-10-08T09:00:00+05:30",
+            "source": "seeded"
+          },
+          {
+            "server": "finance",
+            "tool": "get_cost_table",
+            "finding": "Cost estimates read",
+            "as_of": "2026-10-08",
+            "source": "user_estimate"
+          },
+          {
+            "server": "price",
+            "tool": "check_price",
+            "finding": "2 new listings for 'table' at mainstream stores: Rs 4,499 - Rs 8,999; typical Rs 4,499 - Rs 8,999",
+            "as_of": "2026-10-08T09:00:00+05:30",
+            "source": "seeded"
+          },
+          {
+            "server": "finance",
+            "tool": "get_balance",
+            "finding": "Balance Rs 54,263 (from your statement, as of 2026-10-08)",
+            "as_of": "2026-10-08",
+            "source": "statement_csv"
+          },
+          {
+            "server": "finance",
+            "tool": "get_spending_summary",
+            "finding": "Forecast: salary, rent, bills and SIPs on their usual days; everyday spending by weekday (Rs 266 on Wednesdays to Rs 2,999 on Sundays). Back-tested on your last 4 weeks: off by ~Rs 755 per 3 days (a flat daily average: ~Rs 1,380)",
+            "as_of": "2026-10-08",
+            "source": "statement_csv"
+          },
+          {
+            "server": "finance",
+            "tool": "get_sips",
+            "finding": "SIPs Rs 5,000/mo (2 funds)",
+            "as_of": "2026-10-08",
+            "source": "statement_csv"
+          }
+        ],
+        "tradeoffs": [
+          "Still going out before payday: SIP Rs 3,000 (Sat 10 Oct), SIP Rs 2,000 (Thu 15 Oct), phone bill Rs 299 (Thu 15 Oct) and subscription Rs 199 (Tue 20 Oct)",
+          "Cheapest new at a mainstream store: Rs 4,499 at Seeded Store A",
+          "Your SIPs (Rs 5,000/mo) stay untouched"
+        ],
+        "not_read": [
+          "calendar",
+          "travel"
+        ]
+      },
+      "explanation": null,
+      "trace": [
+        {
+          "server": "gmail",
+          "tool": "list_tasks",
+          "args": {},
+          "ok": true,
+          "ms": 118,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.381+05:30"
+        },
+        {
+          "server": "price",
+          "tool": "check_price",
+          "args": {
+            "item": "table"
+          },
+          "ok": true,
+          "ms": 113,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.386+05:30"
+        },
+        {
+          "server": "finance",
+          "tool": "get_balance",
+          "args": {},
+          "ok": true,
+          "ms": 130,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.390+05:30"
+        },
+        {
+          "server": "finance",
+          "tool": "get_sips",
+          "args": {},
+          "ok": true,
+          "ms": 125,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.395+05:30"
+        },
+        {
+          "server": "finance",
+          "tool": "get_spending_summary",
+          "args": {
+            "days": 30
+          },
+          "ok": true,
+          "ms": 121,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.400+05:30"
+        },
+        {
+          "server": "finance",
+          "tool": "get_cost_table",
+          "args": {},
+          "ok": true,
+          "ms": 117,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.404+05:30"
+        }
+      ],
+      "planner": "rules",
+      "model": null,
+      "intent": {
+        "kind": "purchase",
+        "item": "table",
+        "city": null,
+        "origin": "BLR",
+        "dest": null,
+        "abroad": false,
+        "start": "2026-10-08",
+        "end": null,
+        "people": 1,
+        "expense_type": null,
+        "months": null,
+        "price": null,
+        "today": "2026-10-08"
+      },
+      "offline": {}
+    },
+    "Can I go to a fancy dinner this Saturday with 3 friends?": {
+      "verdict": {
+        "question": "Can I go to a fancy dinner this Saturday with 3 friends?",
+        "kind": "expense",
+        "verdict": "yes_with_conditions",
+        "headline": "Doable if you skip club nights, skip parties and pause shopping until payday (Sun 01 Nov). That keeps you above your Rs 10,000 safety cushion.",
+        "numbers": {
+          "balance": 54263,
+          "trip_cost": {
+            "low": 10000,
+            "high": 24000
+          },
+          "monthly_commitments": 15617,
+          "remaining": {
+            "low": 12909,
+            "high": 26909
+          },
+          "safety_floor": 10000,
+          "cash_on_day": 48708,
+          "pay_day": "2026-10-10",
+          "next_salary": "2026-11-01",
+          "math": [
+            {
+              "label": "Balance (as of Thu 08 Oct)",
+              "amount": 54263
+            },
+            {
+              "label": "Rent, bills & SIPs due Fri 09 Oct - Sat 31 Oct",
+              "amount": -5498
+            },
+            {
+              "label": "Everyday spending forecast, 23 days (Fri 09 Oct - Sat 31 Oct)",
+              "amount": -25760
+            },
+            {
+              "label": "Skip club nights, skip parties and pause shopping, the 23 days left",
+              "amount": 13904
+            },
+            {
+              "label": "Fancy dinner (top of Rs 10,000 - Rs 24,000)",
+              "amount": -24000
+            },
+            {
+              "label": "Left on Sat 31 Oct, the day before payday",
+              "amount": 12909
+            }
+          ],
+          "breakdown": [
+            {
+              "key": "outing",
+              "low": 10000,
+              "high": 24000,
+              "per_person": [
+                2500,
+                6000
+              ],
+              "people": 4,
+              "source": "estimate"
+            }
+          ]
+        },
+        "evidence": [
+          {
+            "server": "calendar",
+            "tool": "list_events",
+            "finding": "1 events read; none that evening",
+            "as_of": "2026-10-08T09:00:00+05:30",
+            "source": "seeded"
+          },
+          {
+            "server": "gmail",
+            "tool": "list_tasks",
+            "finding": "4 emails with deadlines",
+            "as_of": "2026-10-08T09:00:00+05:30",
+            "source": "seeded"
+          },
+          {
+            "server": "gmail",
+            "tool": "list_tasks",
+            "finding": "1 email contains instructions aimed at the AI - treated as data, not followed",
+            "as_of": "2026-10-08T09:00:00+05:30",
+            "source": "seeded"
+          },
+          {
+            "server": "finance",
+            "tool": "get_cost_table",
+            "finding": "Fine dining (5-star, per person): Rs 2,500 - Rs 6,000 per person, x4",
+            "as_of": "2026-10-08",
+            "source": "user_estimate"
+          },
+          {
+            "server": "finance",
+            "tool": "get_balance",
+            "finding": "Balance Rs 54,263 (from your statement, as of 2026-10-08)",
+            "as_of": "2026-10-08",
+            "source": "statement_csv"
+          },
+          {
+            "server": "finance",
+            "tool": "get_spending_summary",
+            "finding": "Forecast: salary, rent, bills and SIPs on their usual days; everyday spending by weekday (Rs 266 on Wednesdays to Rs 2,999 on Sundays). Back-tested on your last 4 weeks: off by ~Rs 755 per 3 days (a flat daily average: ~Rs 1,380)",
+            "as_of": "2026-10-08",
+            "source": "statement_csv"
+          },
+          {
+            "server": "finance",
+            "tool": "get_sips",
+            "finding": "SIPs Rs 5,000/mo (2 funds)",
+            "as_of": "2026-10-08",
+            "source": "statement_csv"
+          }
+        ],
+        "tradeoffs": [
+          "Skip club nights until payday (Sun 01 Nov): saves ~Rs 6,513 (forecast for the 23 days left)",
+          "Skip parties until payday (Sun 01 Nov): saves ~Rs 3,860 (forecast for the 23 days left)",
+          "Pause shopping until payday (Sun 01 Nov): saves ~Rs 3,531 (forecast for the 23 days left)",
+          "Still going out before payday: SIP Rs 3,000 (Sat 10 Oct), SIP Rs 2,000 (Thu 15 Oct), phone bill Rs 299 (Thu 15 Oct) and subscription Rs 199 (Tue 20 Oct)",
+          "Your SIPs (Rs 5,000/mo) stay untouched"
+        ],
+        "not_read": [
+          "price",
+          "travel"
+        ]
+      },
+      "explanation": null,
+      "trace": [
+        {
+          "server": "calendar",
+          "tool": "list_events",
+          "args": {
+            "end": "2026-10-10",
+            "start": "2026-10-10"
+          },
+          "ok": true,
+          "ms": 65,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.588+05:30"
+        },
+        {
+          "server": "gmail",
+          "tool": "list_tasks",
+          "args": {},
+          "ok": true,
+          "ms": 61,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.593+05:30"
+        },
+        {
+          "server": "finance",
+          "tool": "get_balance",
+          "args": {},
+          "ok": true,
+          "ms": 75,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.597+05:30"
+        },
+        {
+          "server": "finance",
+          "tool": "get_sips",
+          "args": {},
+          "ok": true,
+          "ms": 71,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.602+05:30"
+        },
+        {
+          "server": "finance",
+          "tool": "get_spending_summary",
+          "args": {
+            "days": 30
+          },
+          "ok": true,
+          "ms": 67,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.606+05:30"
+        },
+        {
+          "server": "finance",
+          "tool": "get_cost_table",
+          "args": {},
+          "ok": true,
+          "ms": 63,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.611+05:30"
+        }
+      ],
+      "planner": "rules",
+      "model": null,
+      "intent": {
+        "kind": "expense",
+        "item": "fancy dinner",
+        "city": null,
+        "origin": "BLR",
+        "dest": null,
+        "abroad": false,
+        "start": "2026-10-10",
+        "end": null,
+        "people": 4,
+        "expense_type": "fine_dining",
+        "months": null,
+        "price": null,
+        "today": "2026-10-08"
+      },
+      "offline": {}
+    },
+    "Should I learn guitar?": {
+      "verdict": {
+        "question": "Should I learn guitar?",
+        "kind": "other",
+        "verdict": "info",
+        "headline": "I can answer trips, purchases, outings and savings goals. Try: \"Can I buy a laptop this month?\"",
+        "numbers": {
+          "balance": null,
+          "trip_cost": {
+            "low": null,
+            "high": null
+          },
+          "monthly_commitments": null,
+          "remaining": {
+            "low": null,
+            "high": null
+          },
+          "safety_floor": null,
+          "cash_on_day": null,
+          "pay_day": null,
+          "next_salary": null,
+          "math": null,
+          "breakdown": null
+        },
+        "evidence": [
+          {
+            "server": "calendar",
+            "tool": "find_free_slots",
+            "finding": "8 free slots",
+            "as_of": "2026-10-08T09:00:00+05:30",
+            "source": "seeded"
+          },
+          {
+            "server": "calendar",
+            "tool": "list_events",
+            "finding": "7 events read",
+            "as_of": "2026-10-08T09:00:00+05:30",
+            "source": "seeded"
+          },
+          {
+            "server": "gmail",
+            "tool": "list_tasks",
+            "finding": "4 emails with deadlines",
+            "as_of": "2026-10-08T09:00:00+05:30",
+            "source": "seeded"
+          },
+          {
+            "server": "gmail",
+            "tool": "list_tasks",
+            "finding": "1 email contains instructions aimed at the AI - treated as data, not followed",
+            "as_of": "2026-10-08T09:00:00+05:30",
+            "source": "seeded"
+          },
+          {
+            "server": "gmail",
+            "tool": "get_deadlines",
+            "finding": "Q3 quarterly report due Mon 12 Oct 10:00; Book your Tuesday badminton court due Mon 12 Oct 20:00; Your bike insurance expires soon due Tue 20 Oct 23:59",
+            "as_of": "2026-10-08T09:00:00+05:30",
+            "source": "seeded"
+          },
+          {
+            "server": "finance",
+            "tool": "get_cost_table",
+            "finding": "Cost estimates read",
+            "as_of": "2026-10-08",
+            "source": "user_estimate"
+          },
+          {
+            "server": "finance",
+            "tool": "get_balance",
+            "finding": "Balance Rs 54,263 (from your statement, as of 2026-10-08)",
+            "as_of": "2026-10-08",
+            "source": "statement_csv"
+          },
+          {
+            "server": "finance",
+            "tool": "get_spending_summary",
+            "finding": "Forecast: salary, rent, bills and SIPs on their usual days; everyday spending by weekday (Rs 266 on Wednesdays to Rs 2,999 on Sundays). Back-tested on your last 4 weeks: off by ~Rs 755 per 3 days (a flat daily average: ~Rs 1,380)",
+            "as_of": "2026-10-08",
+            "source": "statement_csv"
+          },
+          {
+            "server": "finance",
+            "tool": "get_sips",
+            "finding": "SIPs Rs 5,000/mo (2 funds)",
+            "as_of": "2026-10-08",
+            "source": "statement_csv"
+          }
+        ],
+        "tradeoffs": [],
+        "not_read": [
+          "price",
+          "travel"
+        ]
+      },
+      "explanation": null,
+      "trace": [
+        {
+          "server": "calendar",
+          "tool": "list_events",
+          "args": {
+            "end": "2026-10-22",
+            "start": "2026-10-08"
+          },
+          "ok": true,
+          "ms": 96,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.735+05:30"
+        },
+        {
+          "server": "calendar",
+          "tool": "find_free_slots",
+          "args": {
+            "end": "2026-10-22",
+            "min_minutes": 60,
+            "start": "2026-10-08"
+          },
+          "ok": true,
+          "ms": 96,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.740+05:30"
+        },
+        {
+          "server": "gmail",
+          "tool": "list_tasks",
+          "args": {},
+          "ok": true,
+          "ms": 92,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.744+05:30"
+        },
+        {
+          "server": "gmail",
+          "tool": "get_deadlines",
+          "args": {
+            "end": "2026-10-22",
+            "start": "2026-10-08"
+          },
+          "ok": true,
+          "ms": 86,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.749+05:30"
+        },
+        {
+          "server": "finance",
+          "tool": "get_balance",
+          "args": {},
+          "ok": true,
+          "ms": 93,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.754+05:30"
+        },
+        {
+          "server": "finance",
+          "tool": "get_sips",
+          "args": {},
+          "ok": true,
+          "ms": 83,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.758+05:30"
+        },
+        {
+          "server": "finance",
+          "tool": "get_spending_summary",
+          "args": {
+            "days": 30
+          },
+          "ok": true,
+          "ms": 84,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.763+05:30"
+        },
+        {
+          "server": "finance",
+          "tool": "get_cost_table",
+          "args": {},
+          "ok": true,
+          "ms": 79,
+          "by": "rules",
+          "guardian": "allowed",
+          "ts": "2026-10-09T04:56:39.769+05:30"
+        }
+      ],
+      "planner": "rules",
+      "model": null,
+      "intent": {
+        "kind": "other",
+        "item": null,
+        "city": null,
+        "origin": "BLR",
+        "dest": null,
+        "abroad": false,
+        "start": null,
+        "end": null,
+        "people": 1,
+        "expense_type": null,
+        "months": null,
+        "price": null,
+        "today": "2026-10-08"
+      },
+      "offline": {}
+    }
+  }
+}
