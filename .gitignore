@@ -1,0 +1,38 @@
+# --- secrets: never commit ---
+.env
+.env.*
+!.env.example
+credentials.json
+token.json
+client_secret*.json
+*.pem
+*.key
+
+# --- python ---
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# --- node ---
+node_modules/
+dist/
+
+# --- misc ---
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# --- raw bank statements: never commit, only the masked output ---
+data/raw/
+
+# --- the statement uploaded in a Orbit session (masked, but still personal) ---
+data/session/
+
+# --- live search caches: per machine, rewritten on every live call ---
+data/flights_cache.json
+data/prices_cache.json
+data/hotels_cache.json
