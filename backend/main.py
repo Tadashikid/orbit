@@ -9,6 +9,7 @@ GET  /actions                          -> every booking the agent prepared, newe
 POST /actions/{id}/approve {"hash"}    -> confirm a hold the agent prepared (sandbox: nothing is charged)
 POST /actions/{id}/decline             -> let it go
 GET  /me/phone, POST /me/phone {"phone"} -> your number for WhatsApp/SMS booking alerts ("" removes it)
+GET  /me/telegram, POST /me/telegram/link | /unlink -> Telegram booking alerts: how many chats, a one-time QR link
 POST /me/delete                        -> delete my data: conversations, bookings, statement, Google link, my account
 GET  /google/connect, /google/callback -> link your own Google Calendar + Gmail, read-only (backend/google_link.py)
 GET  /google/status, POST /google/disconnect
@@ -39,6 +40,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
+import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
@@ -55,6 +57,7 @@ import notify  # noqa: E402
 import planner  # noqa: E402
 import statement_import  # noqa: E402
 import store  # noqa: E402
+import telegram  # noqa: E402
 import voice  # noqa: E402
 from registry import SERVERS, Registry  # noqa: E402
 
@@ -371,6 +374,39 @@ def set_phone(body: Phone, request: Request):
     return my_phone(request)
 
 
+@app.get("/me/telegram")
+async def my_telegram(request: Request):
+    """Telegram alerts: set up or not, and how many chats get them. Reads the bot's new messages first, so a chat that
+    just tapped Start on your QR counts here."""
+    if not telegram.ready():
+        return {"ready": False, "chats": 0}
+    with suppress(httpx.HTTPError, ValueError):  # Telegram unreachable: show what's linked so far
+        await telegram.sync()
+    return {"ready": True, "chats": len(telegram.chats(_user(request)))}
+
+
+@app.post("/me/telegram/link")
+async def telegram_link(request: Request):
+    if not telegram.ready():
+        raise HTTPException(503, "Telegram isn't set up: add TELEGRAM_BOT_TOKEN to .env")
+    try:
+        return {"link": await telegram.link(_user(request)), "minutes": telegram.CODE_TTL_S // 60}
+    except (httpx.HTTPError, ValueError) as e:
+        raise HTTPException(502, f"Telegram didn't answer ({str(e)[:120]})") from None
+
+
+@app.post("/me/telegram/unlink")
+async def telegram_unlink(request: Request):
+    store.forget_secret(_user(request), "telegram")
+    return {"ready": telegram.ready(), "chats": 0}
+
+
+async def _alert(owner, body):
+    """The booking message on every channel you set up (WhatsApp / SMS, Telegram): one sentence for the card, or None."""
+    sent = [await alerts.send(store.secret(owner, "phone"), body), await telegram.send(owner, body)]
+    return " ".join(s for s in sent if s) or None
+
+
 @app.post("/me/delete")
 async def delete_me(request: Request, response: Response):
     """Delete my data: conversations, booking cards, your statement, your Google link (revoked with Google) and your
@@ -609,7 +645,7 @@ async def approve(action_id: str, body: Approval, request: Request):
         raise HTTPException(409, f"Couldn't confirm it: {r['error'][-120:]}")
     outcome = {k: r["result"].get(k) for k in ("reference", "payment", "confirmed_at")}
     notice = await notify.confirm(_user(request), r["result"], outcome)  # email + calendar event; never fails the booking
-    alert = await alerts.send(store.secret(_user(request), "phone"), alerts.confirmed(a, r["result"]))  # WhatsApp / SMS
+    alert = await _alert(_user(request), alerts.confirmed(a, r["result"]))  # WhatsApp / SMS, Telegram
     store.move(_user(request), action_id, "approving", "confirmed",
                outcome | ({"notice": notice} if notice else {}) | ({"alert": alert} if alert else {}))
     return _public(store.get_action(_user(request), action_id))
@@ -623,7 +659,7 @@ async def decline(action_id: str, request: Request):
     await _read(_user(request), "booking__release_hold", {"hold_id": a["hold_id"]})  # best effort: holds expire anyway
     guardian.audit(f"decline: {a['summary']}", [{"server": "booking", "tool": "release_hold", "args": {"hold_id": a["hold_id"]},
                                                  "by": "you", "guardian": "declined by you", "error": None}])
-    alert = await alerts.send(store.secret(_user(request), "phone"), alerts.cancelled(a))  # WhatsApp / SMS
+    alert = await _alert(_user(request), alerts.cancelled(a))  # WhatsApp / SMS, Telegram
     return _public(store.get_action(_user(request), action_id)) | ({"outcome": {"alert": alert}} if alert else {})
 
 

@@ -43,6 +43,7 @@ data or switches itself off:
 | Connect Google (read your calendar + inbox) | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ORBIT_TOKEN_KEY` |
 | Booking confirmations (email + calendar) | `ORBIT_NOTIFY_URL`, `ORBIT_NOTIFY_SECRET` |
 | WhatsApp / SMS booking alerts (Twilio) | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM`, `ORBIT_ALERTS` |
+| Telegram booking alerts (anyone who scans the QR) | `TELEGRAM_BOT_TOKEN` |
 
 **Never commit** `.env`, `frontend/.env.local`, the Firebase service-account key, `credentials.json`, `token.json`,
 `data/raw/`, `data/session/` or `*_cache.json` (all gitignored).
