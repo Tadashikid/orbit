@@ -43,7 +43,8 @@ def mcp_servers(statement):
     assert not any(_open(p) for p in PORTS), f"ports {PORTS} are busy: the tests need their own MCP servers"
     env = {**os.environ, "ORBIT_OFFLINE": "1", "ORBIT_STATEMENT": str(statement),
            "ORBIT_CACHE_DIR": str(statement.parent),  # an empty search cache: seeded fares and prices only
-           "ORBIT_HOLDS": str(statement.parent / "holds.json")}
+           "ORBIT_HOLDS": str(statement.parent / "holds.json"),
+           "DUFFEL_ACCESS_TOKEN": ""}  # an empty value wins over .env: tests never call Duffel
     procs = [subprocess.Popen([sys.executable, str(p)], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
              for p in sorted((ROOT / "mcp_servers").glob("*_server.py"))]
     deadline = time.time() + 20

@@ -22,7 +22,7 @@ SCRATCH = Path(tempfile.mkdtemp())  # its own statement and an empty search cach
 os.environ.update(ORBIT_PORT_OFFSET="500", ORBIT_OFFLINE="1", ORBIT_TODAY="2026-10-08", ORBIT_DEMO_PASSWORD=secrets.token_urlsafe(16),
                   ORBIT_DB=str(Path(tempfile.mkdtemp()) / "orbit.db"), ORBIT_AUDIT_LOG=str(Path(tempfile.mkdtemp()) / "audit.jsonl"),
                   ORBIT_STATEMENT=str(SCRATCH / "statement.csv"), ORBIT_CACHE_DIR=str(SCRATCH),
-                  ORBIT_HOLDS=str(SCRATCH / "holds.json"))
+                  ORBIT_HOLDS=str(SCRATCH / "holds.json"), DUFFEL_ACCESS_TOKEN="")  # fixtures stay sandbox
 sys.path.insert(0, str(ROOT / "backend"))
 
 from fastapi.testclient import TestClient  # noqa: E402
