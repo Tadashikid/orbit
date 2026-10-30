@@ -4,6 +4,7 @@
 
 POST /login {"email", "password"}     -> sets the demo session cookie; every endpoint below needs it (401 otherwise)
 POST /logout, GET /me                  -> sign out; who is signed in
+WS   /voice                            -> talk to Orbit: mic audio in, spoken replies out (Gemini Live, backend/voice.py)
 GET  /actions                          -> every booking the agent prepared, newest first (expired holds marked)
 POST /actions/{id}/approve {"hash"}    -> confirm a hold the agent prepared (sandbox: nothing is charged)
 POST /actions/{id}/decline             -> let it go
@@ -28,11 +29,13 @@ import os
 import re
 import time
 from collections import defaultdict
+from contextlib import suppress
 from datetime import date, datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -44,6 +47,7 @@ import guardian  # noqa: E402
 import planner  # noqa: E402
 import statement_import  # noqa: E402
 import store  # noqa: E402
+import voice  # noqa: E402
 from registry import SERVERS, Registry  # noqa: E402
 
 SAMPLES = Path(__file__).resolve().parents[1] / "data" / "samples"
@@ -232,6 +236,25 @@ async def ask(body: Question):
     out = await run_question(body.question, store.history(session))
     store.add_turn(session, body.question, _remember(out))
     return out | {"session_id": session}
+
+
+@app.websocket("/voice")
+async def voice_socket(ws: WebSocket):
+    """Talk to Orbit (backend/voice.py). The HTTP login gate doesn't cover WebSockets, so this checks the cookie
+    itself, and only a page on this machine may open it."""
+    origin = urlsplit(ws.headers.get("origin", "")).hostname
+    if not _user(ws) or origin not in (None, "localhost", "127.0.0.1"):
+        await ws.close(code=4401)
+        return
+    await ws.accept()
+    try:
+        await voice.bridge(ws)
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:  # no key, no quota, Live down: say so in the UI
+        with suppress(Exception):
+            await ws.send_json({"type": "error", "text": f"Voice is unavailable ({type(e).__name__}: {str(e)[:120]})"})
+            await ws.close()
 
 
 @app.post("/agent")
