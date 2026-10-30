@@ -17,7 +17,7 @@ os.environ.setdefault("ORBIT_AUDIT_LOG", os.path.join(_TMP, "audit.jsonl"))
 os.environ.setdefault("ORBIT_DB", os.path.join(_TMP, "orbit.db"))
 os.environ.setdefault("ORBIT_DEMO_PASSWORD", secrets.token_urlsafe(16))  # a fresh demo login per run, for TestClient
 ROOT = Path(__file__).resolve().parents[1]
-PORTS = tuple(p + int(os.environ["ORBIT_PORT_OFFSET"]) for p in (8101, 8102, 8103, 8104, 8105))
+PORTS = tuple(p + int(os.environ["ORBIT_PORT_OFFSET"]) for p in (8101, 8102, 8103, 8104, 8105, 8106))
 SAMPLE = ROOT / "data" / "samples" / "manu_statement.csv"
 
 
@@ -42,7 +42,8 @@ def mcp_servers(statement):
     """Real MCP servers over HTTP, forced to seeded data and the sample statement."""
     assert not any(_open(p) for p in PORTS), f"ports {PORTS} are busy: the tests need their own MCP servers"
     env = {**os.environ, "ORBIT_OFFLINE": "1", "ORBIT_STATEMENT": str(statement),
-           "ORBIT_CACHE_DIR": str(statement.parent)}  # an empty search cache: seeded fares and prices only
+           "ORBIT_CACHE_DIR": str(statement.parent),  # an empty search cache: seeded fares and prices only
+           "ORBIT_HOLDS": str(statement.parent / "holds.json")}
     procs = [subprocess.Popen([sys.executable, str(p)], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
              for p in sorted((ROOT / "mcp_servers").glob("*_server.py"))]
     deadline = time.time() + 20

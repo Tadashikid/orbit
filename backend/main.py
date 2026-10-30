@@ -4,6 +4,8 @@
 
 POST /login {"email", "password"}     -> sets the demo session cookie; every endpoint below needs it (401 otherwise)
 POST /logout, GET /me                  -> sign out; who is signed in
+POST /actions/{id}/approve {"hash"}    -> confirm a hold the agent prepared (sandbox: nothing is charged)
+POST /actions/{id}/decline             -> let it go
 POST /ask {"question", "session_id"?}  -> {"verdict", "explanation", "trace", "planner", "model", "offline", "session_id"}
 POST /agent {"goal", "session_id"?}    -> server-sent events: session, tool, step, message, done (the agent loop)
 GET  /servers                          -> every server: plugged in or not, reachable, and its discovered tools
@@ -22,6 +24,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import time
 from collections import defaultdict
 from datetime import date
@@ -47,7 +50,7 @@ TODAY = date.fromisoformat(os.getenv("ORBIT_TODAY") or date.today().isoformat())
 GEMINI = agent.make_generate()  # None without GEMINI_API_KEY -> rules planner only
 
 app = FastAPI(title="Orbit")
-registry = Registry(plugged=("calendar", "gmail", "travel", "price"))  # ponytail: one shared registry = one user (demo)
+registry = Registry(plugged=("calendar", "gmail", "travel", "price", "booking"))  # ponytail: one shared registry = one user (demo)
 
 # Demo login: one account from .env, a signed httpOnly cookie, every other endpoint behind it. No password set = no way in.
 # ponytail: one hard-coded user, no rate limit; swap for real accounts (Google sign-in / Firebase) before sharing a link.
@@ -238,7 +241,7 @@ async def agent_goal(body: Goal):
     async def events():
         yield _sse({"type": "session", "id": session})
         final = None
-        async for ev in _agent_events(body.goal, store.history(session)):
+        async for ev in _agent_events(body.goal, store.history(session), session):
             final = ev["text"] if ev["type"] == "message" else final
             yield _sse(ev)
         store.add_turn(session, body.goal, {"headline": final})
@@ -251,10 +254,40 @@ def _sse(event):
     return f"data: {json.dumps(event)}\n\n"
 
 
-async def _agent_events(goal, history):
+def _public(action):
+    return {k: v for k, v in action.items() if k not in ("session", "hold_id")}
+
+
+def _proposals(answer):
+    """The exact options the engine priced (fares, hotel, top offer), as holds. The rules path's way to prepare a plan."""
+    v, intent = answer["verdict"], answer["intent"]
+    out = []
+    for part in v["numbers"].get("breakdown") or []:
+        if part["key"] == "flight":
+            out += [("booking__hold_flight", {"origin": leg["from"], "dest": leg["to"], "date": leg["date"],
+                                              "airline": leg["airline"], "depart": leg["depart"], "price": leg["price"]})
+                    for leg in part.get("legs") or []]
+        elif part["key"] == "stay" and part.get("hotel"):
+            out.append(("booking__hold_stay", {"city": intent["city"], "check_in": intent["start"], "check_out": intent["end"],
+                                               "hotel": part["hotel"]["name"], "per_night": part["hotel"]["per_night"]}))
+        elif part["key"] == "product" and part.get("offers"):
+            o = part["offers"][0]
+            out.append(("booking__hold_order", {"item": o["title"], "store": o["store"], "price": o["price"],
+                                                "link": o.get("link") or ""}))
+    return out
+
+
+BOOK = re.compile(r"\b(book|hold|reserve|order|buy it|get it)\b", re.I)
+
+
+async def _agent_events(goal, history, session=None):
     tools = (await registry.discover())["tools"] + [agent.PLAN_TOOL]
     guard = guardian.Guard(tools, goal)
-    trace = []
+    trace, approvals = [], []
+
+    def flush():  # each hold the agent made becomes a card you approve or decline
+        while approvals:
+            yield {"type": "approval", "action": _public(approvals.pop(0))}
 
     async def call(name, args):
         if name == agent.PLAN_TOOL["name"]:  # Orbit's own pipeline, in process: same engine, own Guardian per question
@@ -268,6 +301,8 @@ async def _agent_events(goal, history):
             r["ms"] = round((time.perf_counter() - start) * 1000)
         else:
             r = await registry.call(name, args)
+            if r["ok"] and name.startswith("booking__hold_"):
+                approvals.append(store.add_action(session, r["result"]))
         guard.saw(r)
         return r
 
@@ -278,6 +313,8 @@ async def _agent_events(goal, history):
                 started = True
                 trace += [ev] if ev["type"] == "tool" else []
                 yield ev
+                for card in flush():
+                    yield card
         except Exception as e:
             if started:  # a plan already checked still stands on its own; otherwise say why we stopped
                 plans = [t["answer"]["verdict"]["headline"] for t in trace if t.get("answer")]
@@ -294,8 +331,72 @@ async def _agent_events(goal, history):
             row = agent.entry(r, "rules") | ({"answer": r["answer"]} if r["ok"] else {})
             trace.append(row)
             yield {"type": "tool", **row}
-            yield {"type": "message", "text": r["result"]["verdict"]["headline"] if r["ok"] else r["error"], "model": None}
+            text = r["result"]["verdict"]["headline"] if r["ok"] else r["error"]
+            if r["ok"] and BOOK.search(goal):  # "book it": hold the exact options the engine priced, if Guardian agrees
+                held = 0
+                for name, args in _proposals(r["answer"]):
+                    decision, why = guard.check(name, args)
+                    h = await call(name, args) if decision == "allowed" else {
+                        "server": "booking", "tool": name.partition("__")[2], "args": args, "ok": False, "ms": 0, "error": why}
+                    hrow = agent.entry(h, "rules", decision)
+                    trace.append(hrow)
+                    yield {"type": "tool", **hrow}
+                    held += h["ok"]
+                    for card in flush():
+                        yield card
+                text += f" I've put {held} option{'s' if held != 1 else ''} on hold for you to approve." if held else \
+                    " Nothing was put on hold: connect your budget first, so Orbit can check it fits."
+            yield {"type": "message", "text": text, "model": None}
+    for card in flush():
+        yield card
     guardian.audit(goal, trace)
+
+
+MAX_APPROVAL = int(os.getenv("ORBIT_MAX_APPROVAL") or 50_000)  # per action, in rupees; bigger ones you do yourself
+HEX32 = r"^[0-9a-f]{32}$"
+
+
+class Approval(BaseModel):
+    hash: str = Field(pattern=HEX32)  # the version of the hold you saw
+
+
+def _action_or_404(action_id):
+    a = store.get_action(action_id) if re.fullmatch(HEX32, action_id) else None
+    if not a:
+        raise HTTPException(404, "No such action")
+    return a
+
+
+@app.post("/actions/{action_id}/approve")
+async def approve(action_id: str, body: Approval):
+    """You approving on screen IS the authorization (like uploading a statement): the model has no way to reach this."""
+    a = _action_or_404(action_id)
+    if not hmac.compare_digest(a["hash"].encode(), body.hash.encode()):
+        raise HTTPException(409, "This hold changed since you saw it. Look at it again before approving.")
+    if a["amount"] > MAX_APPROVAL:
+        raise HTTPException(403, f"Over your approval limit of Rs {MAX_APPROVAL:,}. Book this one yourself.")
+    if not store.move(action_id, "pending", "approving"):
+        raise HTTPException(409, f"This hold is already {a['status']}")
+    r = await registry.call("booking__confirm_hold", {"hold_id": a["hold_id"]})
+    row = {"server": "booking", "tool": "confirm_hold", "args": {"hold_id": a["hold_id"]}, "by": "you",
+           "guardian": "approved by you", "error": None if r["ok"] else r["error"][:200]}
+    guardian.audit(f"approve: {a['summary']}", [row])
+    if not r["ok"]:
+        store.move(action_id, "approving", "expired" if "expired" in r["error"] else "failed", {"error": r["error"][:200]})
+        raise HTTPException(409, f"Couldn't confirm it: {r['error'][-120:]}")
+    store.move(action_id, "approving", "confirmed", {k: r["result"].get(k) for k in ("reference", "payment", "confirmed_at")})
+    return _public(store.get_action(action_id))
+
+
+@app.post("/actions/{action_id}/decline")
+async def decline(action_id: str):
+    a = _action_or_404(action_id)
+    if not store.move(action_id, "pending", "declined"):
+        raise HTTPException(409, f"This hold is already {a['status']}")
+    await registry.call("booking__release_hold", {"hold_id": a["hold_id"]})  # best effort: holds expire anyway
+    guardian.audit(f"decline: {a['summary']}", [{"server": "booking", "tool": "release_hold", "args": {"hold_id": a["hold_id"]},
+                                                 "by": "you", "guardian": "declined by you", "error": None}])
+    return _public(store.get_action(action_id))
 
 
 async def run_question(question, history=(), explain=True):
@@ -349,7 +450,7 @@ async def run_question(question, history=(), explain=True):
                 for n, why in catalogue["offline"].items()]
 
     # 3. Decide (deterministic engine), 4. explain (model, words only).
-    verdict = engine.decide(question, intent, results, list(SERVERS))
+    verdict = engine.decide(question, intent, results, [s for s in SERVERS if s != "booking"])  # sources, not actions
     explanation = None
     if other:
         verdict["headline"] = answer or ('I can answer trips, purchases, outings and savings goals. '

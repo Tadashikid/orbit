@@ -147,3 +147,38 @@ def test_demo_login_gates_every_endpoint(monkeypatch):
 
     monkeypatch.setattr(main, "DEMO_PASSWORD", "")  # no password in .env: no way in, even with an old cookie
     assert c.post("/login", json={"email": main.DEMO_EMAIL, "password": ""}).status_code == 503
+
+
+def _events(client, goal):
+    body = client.post("/agent", json={"goal": goal}).text
+    return [json.loads(line[6:]) for line in body.splitlines() if line.startswith("data: ")]
+
+
+def test_booking_holds_wait_for_your_approval(client):
+    """No model: "book it" holds the exact options the engine priced; only your approval confirms one, once."""
+    client.post("/servers/finance/plug")
+    events = _events(client, "Book a Goa trip next weekend")
+    cards = [e["action"] for e in events if e["type"] == "approval"]
+    assert [c["kind"] for c in cards] == ["flight", "flight", "stay"]
+    assert all(c["status"] == "pending" and "session" not in c and "hold_id" not in c for c in cards)
+    assert "on hold for you to approve" in [e for e in events if e["type"] == "message"][0]["text"]
+    holds = [e for e in events if e["type"] == "tool" and e["server"] == "booking"]
+    assert {(h["tool"], h["guardian"], h["by"]) for h in holds} == {("hold_flight", "allowed", "rules"), ("hold_stay", "allowed", "rules")}
+
+    out, back, stay = cards
+    assert client.post(f"/actions/{out['id']}/approve", json={"hash": "0" * 32}).status_code == 409  # not what you saw
+    done = client.post(f"/actions/{out['id']}/approve", json={"hash": out["hash"]}).json()
+    assert done["status"] == "confirmed" and done["outcome"]["reference"].startswith("ORB-")
+    assert "nothing was charged" in done["outcome"]["payment"]
+    assert client.post(f"/actions/{out['id']}/approve", json={"hash": out["hash"]}).status_code == 409  # never twice
+    assert client.post(f"/actions/{stay['id']}/decline").json()["status"] == "declined"
+    assert client.post(f"/actions/{stay['id']}/approve", json={"hash": stay["hash"]}).status_code == 409
+    assert client.post("/actions/not-an-id/approve", json={"hash": stay["hash"]}).status_code == 404
+
+
+def test_no_holds_without_a_budget(client):
+    events = _events(client, "Book a Goa trip next weekend")  # Finance off: the money isn't checked
+    assert not [e for e in events if e["type"] == "approval"]
+    blocked = {e["guardian"] for e in events if e["type"] == "tool" and e["server"] == "booking"}
+    assert blocked == {"blocked"}
+    assert "connect your budget first" in [e for e in events if e["type"] == "message"][0]["text"]
