@@ -7,12 +7,15 @@ export const fixtures = JSON.parse(
   readFileSync(new URL("./fixtures/backend.json", import.meta.url), "utf8"),
 );
 export const HERO = "Can I afford a Goa trip next weekend?";
-export function fakeBackend({ finance = false, statement = false } = {}) {
+export const DEMO_EMAIL = "lokihateshulk@gmail.com";
+export const DEMO_PASSWORD = crypto.randomUUID(); // a fresh one per run
+export function fakeBackend({ finance = false, statement = false, signedIn = true } = {}) {
   const listed = fixtures["GET /servers"];
   const financeTools = fixtures["POST /servers/finance/plug"].servers.find((s) => s.name === "finance").tools;
   const state = {
     plugged: new Set(listed.servers.filter((s) => s.plugged).map((s) => s.name)),
     statement,
+    signedIn,
   };
   if (finance) state.plugged.add("finance");
   const calls = [];
@@ -77,6 +80,18 @@ export function fakeBackend({ finance = false, statement = false } = {}) {
     }
     if (method === "POST" && path === "/ask") return answer(body.question);
     if (method === "POST" && path === "/agent") return agent(body.goal);
+    // The demo login. Tests start signed in; signedIn: false checks the sign-in screen.
+    if (method === "GET" && path === "/me")
+      return state.signedIn ? json({ email: DEMO_EMAIL }) : json({ detail: "Sign in first" }, 401);
+    if (method === "POST" && path === "/login") {
+      if (body.email !== DEMO_EMAIL || body.password !== DEMO_PASSWORD) return json({ detail: "Wrong email or password" }, 401);
+      state.signedIn = true;
+      return json({ email: DEMO_EMAIL });
+    }
+    if (method === "POST" && path === "/logout") {
+      state.signedIn = false;
+      return json({ ok: true });
+    }
     return json({ detail: "Not Found" }, 404);
   };
   return { fetch, calls, state };

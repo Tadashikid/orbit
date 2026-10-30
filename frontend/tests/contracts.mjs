@@ -1,7 +1,7 @@
 // Adapter contract: src/api.ts against real backend responses (tests/fixtures/backend.json via fake-backend.mjs).
 import assert from "node:assert/strict";
 import { createServer } from "vite";
-import { fakeBackend, fixtures, HERO } from "./fake-backend.mjs";
+import { DEMO_EMAIL, DEMO_PASSWORD, fakeBackend, fixtures, HERO } from "./fake-backend.mjs";
 const server = await createServer({
   root: process.cwd(),
   server: { middlewareMode: true },
@@ -10,6 +10,15 @@ const server = await createServer({
 });
 try {
   const { api, toResult, ApiError } = await server.ssrLoadModule("/src/api.ts");
+  // The demo login: signed out, a wrong password is refused, then /me knows who signed in, until logout.
+  const signedOut = fakeBackend({ signedIn: false });
+  globalThis.fetch = signedOut.fetch;
+  assert.equal(await api.me(), null);
+  await assert.rejects(api.login(DEMO_EMAIL, "wrong"), /Wrong email or password/);
+  assert.equal(await api.login(DEMO_EMAIL, DEMO_PASSWORD), DEMO_EMAIL);
+  assert.equal(await api.me(), DEMO_EMAIL);
+  await api.logout();
+  assert.equal(await api.me(), null);
   const fake = fakeBackend();
   globalThis.fetch = fake.fetch;
   // The registry: backend names mapped to the UI's, real status and tools; Finance starts off.
