@@ -238,3 +238,14 @@ def test_questions_about_your_own_data_read_just_that(client, question, reads, s
     d = client.post("/ask", json={"question": question}).json()
     assert {t["tool"] for t in d["trace"]} == reads and says in d["verdict"]["headline"]
     assert d["verdict"]["verdict"] == "info"  # an answer, not a plan: no prices were searched
+
+
+def test_sign_in_comes_first_after_every_start_and_browser_close(monkeypatch):
+    c = TestClient(main.app)
+    r = c.post("/login", json={"email": main.DEMO_EMAIL, "password": main.DEMO_PASSWORD})
+    cookie = r.headers["set-cookie"].lower()
+    assert "max-age" not in cookie and "expires" not in cookie  # a session cookie: gone when the browser closes
+    assert c.get("/me").status_code == 200
+    restarted = main.hashlib.sha256(f"orbit-session:{main.DEMO_PASSWORD}:another-start".encode()).digest()
+    monkeypatch.setattr(main, "_KEY", restarted)  # the backend started again: a new secret
+    assert c.get("/me").status_code == 401  # yesterday's sign-in no longer works: the sign-in page comes first

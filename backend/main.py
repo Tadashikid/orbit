@@ -27,6 +27,7 @@ import hmac
 import json
 import os
 import re
+import secrets
 import time
 from collections import defaultdict
 from contextlib import suppress
@@ -62,7 +63,10 @@ registry = Registry(plugged=("calendar", "gmail", "travel", "price", "booking"))
 DEMO_EMAIL = (os.getenv("ORBIT_DEMO_EMAIL") or "lokihateshulk@gmail.com").strip().lower()
 DEMO_PASSWORD = os.getenv("ORBIT_DEMO_PASSWORD") or ""
 COOKIE = "orbit_session"
-_KEY = hashlib.sha256(f"orbit-session:{DEMO_PASSWORD}".encode()).digest()  # a new password signs everyone out
+# A new secret each time the backend starts (kept across code reloads, see __main__): you sign in again after every
+# start, and a new password signs everyone out too.
+BOOT = os.getenv("ORBIT_BOOT") or secrets.token_hex(16)
+_KEY = hashlib.sha256(f"orbit-session:{DEMO_PASSWORD}:{BOOT}".encode()).digest()
 OPEN = {"/login", "/logout", "/me"}
 
 
@@ -96,7 +100,8 @@ def login(body: Login, response: Response):
     password_ok = hmac.compare_digest(body.password.encode(), DEMO_PASSWORD.encode())
     if not (email_ok and password_ok):
         raise HTTPException(401, "Wrong email or password")
-    response.set_cookie(COOKIE, _signed(DEMO_EMAIL), httponly=True, samesite="strict", max_age=7 * 24 * 3600)
+    # No max_age: a session cookie, so closing the browser signs you out too.
+    response.set_cookie(COOKIE, _signed(DEMO_EMAIL), httponly=True, samesite="strict")
     return {"email": DEMO_EMAIL}
 
 
@@ -532,5 +537,7 @@ if __name__ == "__main__":
     import uvicorn
 
     here = str(Path(__file__).resolve().parent)
+    # One secret for this run: the reloaded workers inherit it, so editing code doesn't sign you out; a restart does.
+    os.environ["ORBIT_BOOT"] = secrets.token_hex(16)
     # reload=True: editing any backend file restarts the API, so a stale backend can't serve old code
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True, app_dir=here, reload_dirs=[here])
