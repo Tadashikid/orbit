@@ -25,15 +25,35 @@ export function fakeBackend({ finance = false, statement = false } = {}) {
     }),
   });
   const json = (body, status = 200) => ({ ok: status < 400, status, text: async () => JSON.stringify(body) });
-  const answer = (question) => {
+  const payload = (question) => {
     const set = state.plugged.has("finance") && state.statement ? fixtures.ask_with_finance : fixtures.ask_without_finance;
-    if (!set[question]) return json({ detail: `no fixture for "${question}"` }, 500);
+    if (!set[question]) return null;
     const r = structuredClone(set[question]);
     const read = (server) => state.plugged.has(server);
     r.verdict.evidence = r.verdict.evidence.filter((e) => read(e.server));
     r.verdict.not_read = [...new Set([...r.verdict.not_read, ...listed.servers.map((s) => s.name).filter((n) => !read(n))])];
     r.trace = r.trace.filter((t) => read(t.server));
-    return json(r);
+    return r;
+  };
+  const missing = (question) => json({ detail: `no fixture for "${question}"` }, 500);
+  const answer = (question) => {
+    const r = payload(question);
+    return r ? json(r) : missing(question);
+  };
+  // POST /agent with no model, as backend/main.py streams it: the goal checked as one plan by Orbit's check_plan.
+  const agent = (goal) => {
+    const r = payload(goal);
+    if (!r) return missing(goal);
+    const events = [
+      { type: "session", id: "0".repeat(32) },
+      { type: "tool", server: "orbit", tool: "check_plan", args: { question: goal }, ok: true, ms: 5, by: "rules",
+        guardian: "allowed", ts: r.trace[0]?.ts ?? "2026-10-08T10:00:00.000+05:30", answer: r },
+      { type: "message", text: r.verdict.headline },
+      { type: "done" },
+    ];
+    return new Response(events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join(""), {
+      headers: { "Content-Type": "text/event-stream" },
+    });
   };
   const fetch = async (url, init = {}) => {
     const method = init.method || "GET";
@@ -56,6 +76,7 @@ export function fakeBackend({ finance = false, statement = false } = {}) {
       return json(fixtures["POST /statement"]);
     }
     if (method === "POST" && path === "/ask") return answer(body.question);
+    if (method === "POST" && path === "/agent") return agent(body.goal);
     return json({ detail: "Not Found" }, 404);
   };
   return { fetch, calls, state };

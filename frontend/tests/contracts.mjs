@@ -66,6 +66,33 @@ try {
   const table = await api.decide("Can I buy a table?", on);
   assert.equal(table.wire.numbers.breakdown[0].key, "product");
   assert.equal((await api.decide("Should I learn guitar?", on)).wire.verdict, "info");
+  // The agent: the conversation id goes back with the next question; a reply that checked several plans shows the
+  // last one in the agent's words, with live steps; a reply that checked no plan is still an answer card.
+  const sent = [];
+  const steps = [];
+  const plan = (q, answer) => ({ type: "tool", server: "orbit", tool: "check_plan", args: { question: q }, ok: true,
+    ms: 1, by: "gemini", guardian: "allowed", ts: "2026-10-08T10:00:00.000+05:30", answer });
+  globalThis.fetch = async (url, init) => {
+    sent.push(JSON.parse(init.body));
+    const events = sent.length === 1
+      ? [{ type: "session", id: "a".repeat(32) },
+         plan("Goa?", fixtures.ask_with_finance[HERO]), plan("Table?", fixtures.ask_with_finance["Can I buy a table?"]),
+         { type: "tool", server: "finance", tool: "load_statement", ok: false, ms: 0, by: "gemini", guardian: "needs_approval",
+           ts: "2026-10-08T10:00:01.000+05:30" },
+         { type: "message", text: "Goa fits, and the table is easy too." }, { type: "done" }]
+      : [{ type: "session", id: "a".repeat(32) }, { type: "message", text: "You have 2 deadlines this week." }, { type: "done" }];
+    return new Response(events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join(""));
+  };
+  api.newConversation();
+  const both = await api.decide("Goa or a table?", on, (s) => steps.push(s));
+  assert.equal(sent[0].session_id, undefined); // a new conversation
+  assert.equal(both.wire.numbers.breakdown[0].key, "product"); // the last plan checked
+  assert.equal(both.explanation, "Goa fits, and the table is easy too.");
+  assert.deepEqual(steps, ["Checked: Goa?", "Checked: Table?", "Guardian stopped load_statement"]);
+  assert(both.trace.some((t) => t.status === "denied"));
+  const chat = await api.decide("Any deadlines?", on);
+  assert.equal(sent[1].session_id, "a".repeat(32)); // same conversation
+  assert.deepEqual([chat.wire.verdict, chat.wire.headline], ["info", "You have 2 deadlines this week."]);
   // Never shows a malformed answer, never pretends when the backend is down.
   assert.throws(() => toResult({ verdict: { verdict: "maybe" } }, on), ApiError);
   globalThis.fetch = async () => {
