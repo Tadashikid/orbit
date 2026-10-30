@@ -356,3 +356,52 @@ def test_your_google_token_goes_only_to_calendar_and_gmail(client, monkeypatch):
     assert all(m is None for s, m in sent if s not in ("calendar", "gmail"))
     assert "token-of" not in json.dumps(d)  # not in the answer, the trace or the evidence
 
+
+
+def test_a_confirmed_booking_is_emailed_and_added_to_your_calendar(client, monkeypatch):
+    """Approve -> the Apps Script webhook gets an email + an event for you. Its failure never undoes the booking."""
+    import httpx
+
+    import notify
+
+    posts, answer = [], {"ok": True}
+
+    def apps_script(request):
+        posts.append(json.loads(request.content))
+        return httpx.Response(200, json=answer)
+
+    real = httpx.AsyncClient
+    monkeypatch.setattr(notify, "_client", lambda **k: real(transport=httpx.MockTransport(apps_script), **k))
+    monkeypatch.setattr(notify, "URL", "https://script.google.com/macros/s/x/exec")
+    monkeypatch.setattr(notify, "SECRET", "s3cret")
+    client.post("/servers/finance/plug")
+    out, back, stay = [e["action"] for e in _events(client, "Book a Goa trip next weekend") if e["type"] == "approval"]
+
+    done = client.post(f"/actions/{out['id']}/approve", json={"hash": out["hash"]}).json()
+    assert done["status"] == "confirmed" and done["outcome"]["notice"] == (
+        f"Confirmation emailed to {main.DEMO_EMAIL} and added to your calendar.")
+    sent = posts[0]
+    assert (sent["secret"], sent["to"]) == ("s3cret", main.DEMO_EMAIL) and sent["subject"] == f"Booked: {out['summary']}"
+    assert sent["event"]["all_day"] is False and sent["event"]["start"].endswith("+05:30")
+    assert datetime.fromisoformat(sent["event"]["end"]) - datetime.fromisoformat(sent["event"]["start"]) == timedelta(hours=2)
+
+    answer = {"ok": False, "error": "wrong secret"}
+    done = client.post(f"/actions/{stay['id']}/approve", json={"hash": stay["hash"]}).json()
+    assert done["status"] == "confirmed" and "couldn't be sent (wrong secret)" in done["outcome"]["notice"]
+    assert posts[1]["event"]["all_day"] is True and "T00:00:00+05:30" in posts[1]["event"]["start"]
+
+    monkeypatch.setattr(notify, "URL", "")  # not set up: bookings work exactly as before, no notice
+    assert "notice" not in client.post(f"/actions/{back['id']}/approve", json={"hash": back["hash"]}).json()["outcome"]
+    assert len(posts) == 2
+
+
+def test_duffel_flight_times_make_the_calendar_event():
+    import notify
+
+    booking = {"kind": "flight", "summary": "BA BLR→GOI", "details": {
+        "origin": "BLR", "dest": "GOI", "airline": "British Airways", "flight": "BA123",
+        "departing_at": "2026-11-14T06:05:00", "arriving_at": "2026-11-14T07:20:00"}}
+    ev = notify.event(booking)
+    assert (ev["start"], ev["end"]) == ("2026-11-14T06:05:00+05:30", "2026-11-14T07:20:00+05:30")
+    assert ev["title"] == "✈ BLR → GOI · British Airways BA123"
+    assert notify.event({"kind": "order", "summary": "iPhone", "details": {}}) is None  # a purchase is just the email

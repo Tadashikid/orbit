@@ -114,11 +114,15 @@ def _duffel_hold(origin, dest, date, airline):
     else:
         raise ValueError(f"Duffel's fares from {origin} to {dest} on {date} kept selling out. Try again in a minute.")
     owner = offer["owner"]["name"]
+    legs = (order.get("slices") or [{}])[0].get("segments") or [{}]  # the times and flight number, for the calendar
+    carrier = legs[0].get("marketing_carrier") or {}
     summary = f"{owner} {origin}→{dest} {Date.fromisoformat(date):%a %d %b} · Duffel test"
     return _hold("flight", summary, float(order["total_amount"]), {
         "provider": "duffel", "order_id": order["id"], "offer_id": offer["id"], "airline": owner, "asked_for": airline,
         "origin": origin, "dest": dest, "date": date, "total_amount": order["total_amount"],
-        "total_currency": order["total_currency"]},
+        "total_currency": order["total_currency"], "departing_at": legs[0].get("departing_at"),
+        "arriving_at": legs[-1].get("arriving_at"),
+        "flight": f"{carrier.get('iata_code', '')}{legs[0].get('marketing_carrier_flight_number', '')}"},
         currency=order["total_currency"], expires_at=order["payment_status"]["payment_required_by"])
 
 

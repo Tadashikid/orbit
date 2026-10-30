@@ -63,6 +63,7 @@ export default function Approvals({
                     <Check size={16} /> Confirmed · {a.outcome?.reference}. {a.outcome?.payment}
                   </span>
                 )}
+                {a.status === "confirmed" && a.outcome?.notice && <span className="approval-done">{a.outcome.notice}</span>}
                 {["declined", "expired", "failed"].includes(a.status) && (
                   <span className="approval-done">
                     <X size={16} /> {a.status === "declined" ? "Let go" : a.status === "expired" ? "Hold expired" : "Couldn't confirm"}

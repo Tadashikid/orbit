@@ -48,6 +48,7 @@ import agent  # noqa: E402  (reads GEMINI_* from .env)
 import engine  # noqa: E402
 import google_link  # noqa: E402
 import guardian  # noqa: E402
+import notify  # noqa: E402
 import planner  # noqa: E402
 import statement_import  # noqa: E402
 import store  # noqa: E402
@@ -548,7 +549,9 @@ async def approve(action_id: str, body: Approval, request: Request):
     if not r["ok"]:
         store.move(_user(request), action_id, "approving", "expired" if "expired" in r["error"] else "failed", {"error": r["error"][:200]})
         raise HTTPException(409, f"Couldn't confirm it: {r['error'][-120:]}")
-    store.move(_user(request), action_id, "approving", "confirmed", {k: r["result"].get(k) for k in ("reference", "payment", "confirmed_at")})
+    outcome = {k: r["result"].get(k) for k in ("reference", "payment", "confirmed_at")}
+    notice = await notify.confirm(_user(request), r["result"], outcome)  # email + calendar event; never fails the booking
+    store.move(_user(request), action_id, "approving", "confirmed", outcome | ({"notice": notice} if notice else {}))
     return _public(store.get_action(_user(request), action_id))
 
 

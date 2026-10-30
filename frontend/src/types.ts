@@ -152,7 +152,7 @@ export interface Approval {
   expires_at: string;
   hash: string; // the version you saw; approving sends it back
   status: "pending" | "approving" | "confirmed" | "declined" | "expired" | "failed";
-  outcome?: { reference?: string; payment?: string; error?: string };
+  outcome?: { reference?: string; payment?: string; error?: string; notice?: string }; // notice: the confirmation email
 }
 export interface DecisionResult {
   approvals: Approval[];
