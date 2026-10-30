@@ -17,8 +17,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 # private: reads your data, which stays here. outbound: sends its args to a third party (SerpAPI, costs credits).
-# write: changes data, only you can approve it. A tool that isn't listed doesn't run.
+# write: changes data, only you can approve it. plan: Orbit's own check_plan, which runs the whole read pipeline
+# (may hit SerpAPI) and returns your numbers, so it is budgeted and leak-checked like outbound, remembered like private.
+# A tool that isn't listed doesn't run.
 POLICY = {
+    "orbit__check_plan": "plan",
     "calendar__list_events": "private", "calendar__find_free_slots": "private",
     "gmail__list_tasks": "private", "gmail__get_deadlines": "private",
     "finance__get_balance": "private", "finance__get_sips": "private",
@@ -54,7 +57,7 @@ class Guard:
             return "needs_approval", WRITE
         if self.calls >= MAX_CALLS:
             return "blocked", f"call budget used up ({MAX_CALLS} per question)"
-        if kind == "outbound":
+        if kind in ("outbound", "plan"):
             if self.outbound >= MAX_OUTBOUND:
                 return "blocked", f"outside-search budget used up ({MAX_OUTBOUND} per question)"
             # ponytail: literal match only; a model spelling digits out ("five four...") gets past. Fine while the
@@ -68,7 +71,7 @@ class Guard:
 
     def saw(self, result):
         """Remember the numbers (>= 1000) and emails a private read returned."""
-        if not result.get("ok") or POLICY.get(f"{result['server']}__{result['tool']}") != "private":
+        if not result.get("ok") or POLICY.get(f"{result['server']}__{result['tool']}") not in ("private", "plan"):
             return
         found = set()
 

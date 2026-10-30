@@ -97,3 +97,33 @@ def test_no_model_answering_raises_so_rules_planner_takes_over():
 
     with pytest.raises(RuntimeError):
         asyncio.run(agent.gather("q", "facts", CATALOGUE, None, None, generate, ["gemini-3.8-flash"]))
+
+
+def test_agent_loop_chains_plans_and_guardian_still_decides():
+    """Goal -> the model checks two plans in one round, tries a write, then answers. Events stream out per call."""
+    tools = CATALOGUE + [agent.PLAN_TOOL]
+    turns = iter([reply(("orbit__check_plan", {"question": "Can I afford Goa next weekend?"}),
+                        ("orbit__check_plan", {"question": "Can I afford Kerala next weekend?"}),
+                        ("finance__load_statement", {"statement": "forged"})),
+                  reply(text="Goa fits, Kerala doesn't.")])
+    seen = []
+
+    async def generate(contents, config, chain):
+        seen.append(contents[0].parts[0].text)
+        return "fake-model", next(turns)
+
+    async def call_tool(name, args):
+        verdict = "yes" if "Goa" in args["question"] else "no"
+        return {"server": "orbit", "tool": "check_plan", "args": args, "ok": True, "ms": 1, "result": {"verdict": {"verdict": verdict}}}
+
+    async def collect():
+        guard = guardian.Guard(tools, "Goa or Kerala?")
+        history = [{"question": "Can I afford Goa?", "answer": {"verdict": "yes"}}]
+        return [e async for e in agent.run("Goa or Kerala?", history, tools, call_tool, guard.check, generate, ["fake-model"])]
+
+    events = asyncio.run(collect())
+    assert [(e["type"], e.get("tool"), e.get("guardian")) for e in events] == [
+        ("tool", "check_plan", "allowed"), ("tool", "check_plan", "allowed"), ("tool", "load_statement", "needs_approval"), ("message", None, None)]
+    assert [e["result"]["verdict"]["verdict"] for e in events[:2]] == ["yes", "no"]
+    assert events[-1]["text"] == "Goa fits, Kerala doesn't."
+    assert "Can I afford Goa?" in seen[0]  # the earlier turn reached the model
