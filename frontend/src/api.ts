@@ -42,6 +42,10 @@ export interface OrbitApi {
   // `onStep` gets a short, human line for each step the agent takes, as it happens.
   decide(question: string, servers: Server[], onStep?: (step: string) => void): Promise<DecisionResult>;
   newConversation(): void;
+  // The demo login: the backend sets an httpOnly cookie; the UI only learns who is signed in.
+  me(): Promise<string | null>;
+  login(email: string, password: string): Promise<string>;
+  logout(): Promise<void>;
   servers(): Promise<{ servers: Server[]; today: string }>;
   setSource(id: string, on: boolean): Promise<{ servers: Server[]; today: string }>;
   statement(): Promise<StatementInfo | null>;
@@ -247,6 +251,21 @@ export const api: OrbitApi = {
   },
   newConversation() {
     session = null;
+  },
+  async me() {
+    try {
+      return (await call<{ email: string }>("/me")).email;
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) return null;
+      throw e;
+    }
+  },
+  async login(email, password) {
+    return (await call<{ email: string }>("/login", { email, password })).email;
+  },
+  async logout() {
+    session = null;
+    await call("/logout", {});
   },
   async servers() {
     return toServers(await call("/servers"));

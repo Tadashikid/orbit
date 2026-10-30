@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Eye,
   Info,
+  LogOut,
   SlidersHorizontal,
   Wallet,
   ShieldCheck,
@@ -88,7 +89,7 @@ function NudgeToast({ n, onDismiss }: { n: Nudge; onDismiss: () => void }) {
     </motion.div>
   );
 }
-export default function App() {
+export default function App({ onSignOut }: { onSignOut?: () => void }) {
   const { reduced } = useSurfaceMotion();
   const d = useDecision();
   const [servers, setServers] = useState<Server[]>([]);
@@ -256,6 +257,11 @@ export default function App() {
           >
             <SlidersHorizontal size={20} />
           </button>
+          {onSignOut && (
+            <button className="discreet-button" aria-label="Sign out" title="Sign out" onClick={onSignOut}>
+              <LogOut size={20} />
+            </button>
+          )}
         </div>
       </header>
       <SourceDock
