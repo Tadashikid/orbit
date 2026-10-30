@@ -70,6 +70,38 @@
             "read_only": true
           }
         ]
+      },
+      {
+        "name": "booking",
+        "plugged": true,
+        "status": "connected",
+        "tools": [
+          {
+            "name": "hold_flight",
+            "description": "Hold one flight (an exact fare from search_flights) for 30 minutes. Free, reversible, nothing is paid.\ndate is YYYY-MM-DD, depart is HH:MM, price in whole rupees.",
+            "read_only": false
+          },
+          {
+            "name": "hold_stay",
+            "description": "Hold a hotel stay (an exact hotel from search_hotels) for 30 minutes. Free, reversible, nothing is paid.\nDates are YYYY-MM-DD; per_night in whole rupees.",
+            "read_only": false
+          },
+          {
+            "name": "hold_order",
+            "description": "Put one product (an exact offer from check_price) in a cart for 30 minutes. Free, reversible, nothing is paid.",
+            "read_only": false
+          },
+          {
+            "name": "release_hold",
+            "description": "Let a hold go. Nothing was paid, so there is nothing to refund.",
+            "read_only": false
+          },
+          {
+            "name": "confirm_hold",
+            "description": "Confirm a hold. Only Orbit's approval endpoint calls this, after the user approves it on screen.",
+            "read_only": false
+          }
+        ]
       }
     ],
     "today": "2026-10-08"
@@ -225,51 +257,51 @@
           "server": "calendar",
           "tool": "list_events",
           "args": {
-            "end": "2026-10-12",
-            "start": "2026-10-08"
+            "start": "2026-10-08",
+            "end": "2026-10-12"
           },
           "ok": true,
-          "ms": 89,
+          "ms": 135,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:15.973+05:30"
+          "ts": "2026-10-30T15:36:10.625+05:30"
         },
         {
           "server": "calendar",
           "tool": "find_free_slots",
           "args": {
-            "end": "2026-10-12",
+            "start": "2026-10-08",
             "min_minutes": 60,
-            "start": "2026-10-08"
+            "end": "2026-10-12"
           },
           "ok": true,
-          "ms": 85,
+          "ms": 126,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:15.978+05:30"
+          "ts": "2026-10-30T15:36:10.633+05:30"
         },
         {
           "server": "gmail",
           "tool": "list_tasks",
           "args": {},
           "ok": true,
-          "ms": 88,
+          "ms": 125,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:15.983+05:30"
+          "ts": "2026-10-30T15:36:10.638+05:30"
         },
         {
           "server": "gmail",
           "tool": "get_deadlines",
           "args": {
-            "end": "2026-10-12",
-            "start": "2026-10-08"
+            "start": "2026-10-08",
+            "end": "2026-10-12"
           },
           "ok": true,
-          "ms": 85,
+          "ms": 117,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:15.988+05:30"
+          "ts": "2026-10-30T15:36:10.647+05:30"
         },
         {
           "server": "travel",
@@ -280,10 +312,10 @@
             "date": "2026-10-10"
           },
           "ok": true,
-          "ms": 78,
+          "ms": 110,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:15.993+05:30"
+          "ts": "2026-10-30T15:36:10.655+05:30"
         },
         {
           "server": "travel",
@@ -294,24 +326,24 @@
             "date": "2026-10-11"
           },
           "ok": true,
-          "ms": 76,
+          "ms": 96,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:15.998+05:30"
+          "ts": "2026-10-30T15:36:10.669+05:30"
         },
         {
           "server": "travel",
           "tool": "search_hotels",
           "args": {
-            "city": "Goa",
             "check_out": "2026-10-11",
+            "city": "Goa",
             "check_in": "2026-10-10"
           },
           "ok": true,
-          "ms": 71,
+          "ms": 89,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.002+05:30"
+          "ts": "2026-10-30T15:36:10.677+05:30"
         }
       ],
       "planner": "rules",
@@ -332,7 +364,7 @@
         "today": "2026-10-08"
       },
       "offline": {},
-      "session_id": "8a0fbb834eeb4e6baa713e363a0f5a26"
+      "session_id": "195cee037d514dc8816310bfb0e6d949"
     }
   },
   "POST /servers/finance/plug": {
@@ -429,6 +461,38 @@
             "name": "check_price",
             "description": "Current prices in India for an item to buy (a short shopping query, e.g. \"iPhone 16\", \"PS5\", \"laptop\").\nListings are cleaned (no refurbished, accessories, other models, wholesale or scam prices), cheapest first, each\nwith store, MRP, rating, reviews, delivery and whether the store is a mainstream (trusted) one.\nEvery answer says where the prices came from (source: live | cached | seeded) and when (as_of).",
             "read_only": true
+          }
+        ]
+      },
+      {
+        "name": "booking",
+        "plugged": true,
+        "status": "connected",
+        "tools": [
+          {
+            "name": "hold_flight",
+            "description": "Hold one flight (an exact fare from search_flights) for 30 minutes. Free, reversible, nothing is paid.\ndate is YYYY-MM-DD, depart is HH:MM, price in whole rupees.",
+            "read_only": false
+          },
+          {
+            "name": "hold_stay",
+            "description": "Hold a hotel stay (an exact hotel from search_hotels) for 30 minutes. Free, reversible, nothing is paid.\nDates are YYYY-MM-DD; per_night in whole rupees.",
+            "read_only": false
+          },
+          {
+            "name": "hold_order",
+            "description": "Put one product (an exact offer from check_price) in a cart for 30 minutes. Free, reversible, nothing is paid.",
+            "read_only": false
+          },
+          {
+            "name": "release_hold",
+            "description": "Let a hold go. Nothing was paid, so there is nothing to refund.",
+            "read_only": false
+          },
+          {
+            "name": "confirm_hold",
+            "description": "Confirm a hold. Only Orbit's approval endpoint calls this, after the user approves it on screen.",
+            "read_only": false
           }
         ]
       }
@@ -855,51 +919,51 @@
           "server": "calendar",
           "tool": "list_events",
           "args": {
-            "end": "2026-10-12",
-            "start": "2026-10-08"
+            "start": "2026-10-08",
+            "end": "2026-10-12"
           },
           "ok": true,
-          "ms": 190,
+          "ms": 277,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.374+05:30"
+          "ts": "2026-10-30T15:36:11.178+05:30"
         },
         {
           "server": "calendar",
           "tool": "find_free_slots",
           "args": {
-            "end": "2026-10-12",
+            "start": "2026-10-08",
             "min_minutes": 60,
-            "start": "2026-10-08"
+            "end": "2026-10-12"
           },
           "ok": true,
-          "ms": 186,
+          "ms": 271,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.379+05:30"
+          "ts": "2026-10-30T15:36:11.184+05:30"
         },
         {
           "server": "gmail",
           "tool": "list_tasks",
           "args": {},
           "ok": true,
-          "ms": 174,
+          "ms": 265,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.383+05:30"
+          "ts": "2026-10-30T15:36:11.191+05:30"
         },
         {
           "server": "gmail",
           "tool": "get_deadlines",
           "args": {
-            "end": "2026-10-12",
-            "start": "2026-10-08"
+            "start": "2026-10-08",
+            "end": "2026-10-12"
           },
           "ok": true,
-          "ms": 170,
+          "ms": 258,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.388+05:30"
+          "ts": "2026-10-30T15:36:11.198+05:30"
         },
         {
           "server": "travel",
@@ -910,10 +974,10 @@
             "date": "2026-10-10"
           },
           "ok": true,
-          "ms": 174,
+          "ms": 252,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.392+05:30"
+          "ts": "2026-10-30T15:36:11.205+05:30"
         },
         {
           "server": "travel",
@@ -924,44 +988,44 @@
             "date": "2026-10-11"
           },
           "ok": true,
-          "ms": 170,
+          "ms": 251,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.397+05:30"
+          "ts": "2026-10-30T15:36:11.211+05:30"
         },
         {
           "server": "travel",
           "tool": "search_hotels",
           "args": {
-            "city": "Goa",
             "check_out": "2026-10-11",
+            "city": "Goa",
             "check_in": "2026-10-10"
           },
           "ok": true,
-          "ms": 166,
+          "ms": 244,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.402+05:30"
+          "ts": "2026-10-30T15:36:11.217+05:30"
         },
         {
           "server": "finance",
           "tool": "get_balance",
           "args": {},
           "ok": true,
-          "ms": 162,
+          "ms": 237,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.406+05:30"
+          "ts": "2026-10-30T15:36:11.224+05:30"
         },
         {
           "server": "finance",
           "tool": "get_sips",
           "args": {},
           "ok": true,
-          "ms": 160,
+          "ms": 231,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.411+05:30"
+          "ts": "2026-10-30T15:36:11.232+05:30"
         },
         {
           "server": "finance",
@@ -970,20 +1034,20 @@
             "days": 30
           },
           "ok": true,
-          "ms": 151,
+          "ms": 223,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.418+05:30"
+          "ts": "2026-10-30T15:36:11.241+05:30"
         },
         {
           "server": "finance",
           "tool": "get_cost_table",
           "args": {},
           "ok": true,
-          "ms": 147,
+          "ms": 213,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.423+05:30"
+          "ts": "2026-10-30T15:36:11.251+05:30"
         }
       ],
       "planner": "rules",
@@ -1004,7 +1068,7 @@
         "today": "2026-10-08"
       },
       "offline": {},
-      "session_id": "b6ec1b52698e40adab8b028aeaeba465"
+      "session_id": "792dc04b3f42453ab4f18b0fe1747bfd"
     },
     "Can I buy a table?": {
       "verdict": {
@@ -1147,10 +1211,10 @@
           "tool": "list_tasks",
           "args": {},
           "ok": true,
-          "ms": 71,
+          "ms": 97,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.638+05:30"
+          "ts": "2026-10-30T15:36:11.583+05:30"
         },
         {
           "server": "price",
@@ -1159,30 +1223,30 @@
             "item": "table"
           },
           "ok": true,
-          "ms": 66,
+          "ms": 90,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.643+05:30"
+          "ts": "2026-10-30T15:36:11.590+05:30"
         },
         {
           "server": "finance",
           "tool": "get_balance",
           "args": {},
           "ok": true,
-          "ms": 82,
+          "ms": 97,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.647+05:30"
+          "ts": "2026-10-30T15:36:11.596+05:30"
         },
         {
           "server": "finance",
           "tool": "get_sips",
           "args": {},
           "ok": true,
-          "ms": 79,
+          "ms": 95,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.652+05:30"
+          "ts": "2026-10-30T15:36:11.602+05:30"
         },
         {
           "server": "finance",
@@ -1191,20 +1255,20 @@
             "days": 30
           },
           "ok": true,
-          "ms": 68,
+          "ms": 86,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.657+05:30"
+          "ts": "2026-10-30T15:36:11.609+05:30"
         },
         {
           "server": "finance",
           "tool": "get_cost_table",
           "args": {},
           "ok": true,
-          "ms": 71,
+          "ms": 81,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.661+05:30"
+          "ts": "2026-10-30T15:36:11.615+05:30"
         }
       ],
       "planner": "rules",
@@ -1225,7 +1289,7 @@
         "today": "2026-10-08"
       },
       "offline": {},
-      "session_id": "74e68e40ec0f4b7888bfc897b1f79f22"
+      "session_id": "774327df5f4c4ebeb8bf09fdcfedcc0c"
     },
     "Can I go to a fancy dinner this Saturday with 3 friends?": {
       "verdict": {
@@ -1357,44 +1421,44 @@
           "server": "calendar",
           "tool": "list_events",
           "args": {
-            "end": "2026-10-10",
-            "start": "2026-10-10"
+            "start": "2026-10-10",
+            "end": "2026-10-10"
           },
           "ok": true,
-          "ms": 66,
+          "ms": 101,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.798+05:30"
+          "ts": "2026-10-30T15:36:11.816+05:30"
         },
         {
           "server": "gmail",
           "tool": "list_tasks",
           "args": {},
           "ok": true,
-          "ms": 61,
+          "ms": 92,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.803+05:30"
+          "ts": "2026-10-30T15:36:11.824+05:30"
         },
         {
           "server": "finance",
           "tool": "get_balance",
           "args": {},
           "ok": true,
-          "ms": 75,
+          "ms": 104,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.807+05:30"
+          "ts": "2026-10-30T15:36:11.835+05:30"
         },
         {
           "server": "finance",
           "tool": "get_sips",
           "args": {},
           "ok": true,
-          "ms": 72,
+          "ms": 106,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.812+05:30"
+          "ts": "2026-10-30T15:36:11.843+05:30"
         },
         {
           "server": "finance",
@@ -1403,20 +1467,20 @@
             "days": 30
           },
           "ok": true,
-          "ms": 68,
+          "ms": 100,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.816+05:30"
+          "ts": "2026-10-30T15:36:11.851+05:30"
         },
         {
           "server": "finance",
           "tool": "get_cost_table",
           "args": {},
           "ok": true,
-          "ms": 64,
+          "ms": 94,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.821+05:30"
+          "ts": "2026-10-30T15:36:11.858+05:30"
         }
       ],
       "planner": "rules",
@@ -1437,7 +1501,7 @@
         "today": "2026-10-08"
       },
       "offline": {},
-      "session_id": "64f3af364d224ba3b6f966e714078e41"
+      "session_id": "3d5ad66e5b2b4334a90c2af062a68450"
     },
     "Should I learn guitar?": {
       "verdict": {
@@ -1540,71 +1604,71 @@
           "server": "calendar",
           "tool": "list_events",
           "args": {
-            "end": "2026-10-22",
-            "start": "2026-10-08"
+            "start": "2026-10-08",
+            "end": "2026-10-22"
           },
           "ok": true,
-          "ms": 94,
+          "ms": 151,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.950+05:30"
+          "ts": "2026-10-30T15:36:12.095+05:30"
         },
         {
           "server": "calendar",
           "tool": "find_free_slots",
           "args": {
-            "end": "2026-10-22",
+            "start": "2026-10-08",
             "min_minutes": 60,
-            "start": "2026-10-08"
+            "end": "2026-10-22"
           },
           "ok": true,
-          "ms": 91,
+          "ms": 145,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.955+05:30"
+          "ts": "2026-10-30T15:36:12.102+05:30"
         },
         {
           "server": "gmail",
           "tool": "list_tasks",
           "args": {},
           "ok": true,
-          "ms": 89,
+          "ms": 144,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.960+05:30"
+          "ts": "2026-10-30T15:36:12.108+05:30"
         },
         {
           "server": "gmail",
           "tool": "get_deadlines",
           "args": {
-            "end": "2026-10-22",
-            "start": "2026-10-08"
+            "start": "2026-10-08",
+            "end": "2026-10-22"
           },
           "ok": true,
-          "ms": 85,
+          "ms": 135,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.964+05:30"
+          "ts": "2026-10-30T15:36:12.116+05:30"
         },
         {
           "server": "finance",
           "tool": "get_balance",
           "args": {},
           "ok": true,
-          "ms": 90,
+          "ms": 132,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.969+05:30"
+          "ts": "2026-10-30T15:36:12.123+05:30"
         },
         {
           "server": "finance",
           "tool": "get_sips",
           "args": {},
           "ok": true,
-          "ms": 86,
+          "ms": 134,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.973+05:30"
+          "ts": "2026-10-30T15:36:12.131+05:30"
         },
         {
           "server": "finance",
@@ -1613,20 +1677,20 @@
             "days": 30
           },
           "ok": true,
-          "ms": 79,
+          "ms": 128,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.978+05:30"
+          "ts": "2026-10-30T15:36:12.138+05:30"
         },
         {
           "server": "finance",
           "tool": "get_cost_table",
           "args": {},
           "ok": true,
-          "ms": 76,
+          "ms": 123,
           "by": "rules",
           "guardian": "allowed",
-          "ts": "2026-10-30T15:21:16.982+05:30"
+          "ts": "2026-10-30T15:36:12.145+05:30"
         }
       ],
       "planner": "rules",
@@ -1647,7 +1711,7 @@
         "today": "2026-10-08"
       },
       "offline": {},
-      "session_id": "0b7a63216d8b46d08e98d6e46dc687fc"
+      "session_id": "d15ed856e2b440428662fbab43fa0be3"
     }
   }
 }

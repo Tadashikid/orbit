@@ -32,6 +32,7 @@ try {
       ["finance", "Finance", "off", "off"],
       ["travel", "Travel", "connected", "allow"],
       ["price", "Price Check", "connected", "allow"],
+      ["booking", "Bookings", "connected", "allow"], // holds only; switching it off means nothing can be held
     ],
   );
   assert.deepEqual(servers.find((s) => s.id === "travel").tools.map((t) => t.name), ["search_flights", "search_hotels"]);
@@ -102,6 +103,23 @@ try {
   const chat = await api.decide("Any deadlines?", on);
   assert.equal(sent[1].session_id, "a".repeat(32)); // same conversation
   assert.deepEqual([chat.wire.verdict, chat.wire.headline], ["info", "You have 2 deadlines this week."]);
+  // Holds: an approval card comes with the plan; approving sends back the version of the hold you saw.
+  const card = { id: "b".repeat(32), kind: "flight", summary: "IndiGo BLR→GOI Sat 10 Oct 21:00", amount: 6411,
+    expires_at: "2026-10-08T10:30:00+05:30", hash: "c".repeat(32), status: "pending" };
+  const posted = [];
+  globalThis.fetch = async (url, init) => {
+    posted.push([String(url), JSON.parse(init.body)]);
+    if (String(url).endsWith("/agent"))
+      return new Response([{ type: "session", id: "a".repeat(32) }, plan("Book Goa", fixtures.ask_with_finance[HERO]),
+        { type: "approval", action: card }, { type: "message", text: "Held 1 option." }, { type: "done" }]
+        .map((e) => `data: ${JSON.stringify(e)}\n\n`).join(""));
+    return new Response(JSON.stringify({ ...card, status: "confirmed", outcome: { reference: "ORB-ABC123" } }));
+  };
+  const booked = await api.decide("Book Goa", on, (s) => steps.push(s));
+  assert.deepEqual(booked.approvals, [card]);
+  assert.equal(steps.at(-1), `Held: ${card.summary}`);
+  assert.equal((await api.approve(card)).status, "confirmed");
+  assert.deepEqual(posted.at(-1), [`/api/actions/${card.id}/approve`, { hash: card.hash }]);
   // Never shows a malformed answer, never pretends when the backend is down.
   assert.throws(() => toResult({ verdict: { verdict: "maybe" } }, on), ApiError);
   globalThis.fetch = async () => {
