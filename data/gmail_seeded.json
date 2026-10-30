@@ -32,6 +32,66 @@
       "received": "2026-10-07T21:05:00+05:30",
       "subject": "Your order is on its way",
       "snippet": "Your order from Meghana Foods will arrive in 25 minutes."
+    },
+    {
+      "from": "Rahul (Landlord) <rahul.k@gmail.example>",
+      "received": "2026-10-26T09:10:00+05:30",
+      "subject": "Rent for November - due 1 Nov 2026",
+      "snippet": "Hi Manu, gentle reminder that November rent is due 1 Nov 2026. Same account as usual. Thanks, Rahul"
+    },
+    {
+      "from": "Devfolio <team@devfolio.example>",
+      "received": "2026-10-27T12:00:00+05:30",
+      "subject": "Hackathon registration closes soon",
+      "snippet": "Bengaluru hackathon on 14-15 Nov. Team registration due 2 Nov 2026, 23:59. Add your teammates before then."
+    },
+    {
+      "from": "BESCOM <billing@bescom.example>",
+      "received": "2026-10-28T07:30:00+05:30",
+      "subject": "Your electricity bill is ready",
+      "snippet": "Bill for account 4402198765 is Rs 1,240. Payment due 5 Nov 2026 to avoid a late fee."
+    },
+    {
+      "from": "Priya Nair <priya.nair@acmetech.example>",
+      "received": "2026-10-29T17:40:00+05:30",
+      "subject": "Project proposal draft - due 6 Nov 2026, 16:00",
+      "snippet": "Manu, please send the proposal draft before the review. Deadline: 6 Nov 2026, 16:00."
+    },
+    {
+      "from": "HDFC Bank <alerts@hdfcbank.example>",
+      "received": "2026-10-30T08:00:00+05:30",
+      "subject": "Credit card statement generated",
+      "snippet": "Your statement for card ending 4421 is ready. Total due Rs 18,430. Payment due 12 Nov 2026."
+    },
+    {
+      "from": "BookMyShow <tickets@bookmyshow.example>",
+      "received": "2026-10-25T20:15:00+05:30",
+      "subject": "Tickets on sale: Prateek Kuhad live",
+      "snippet": "Prateek Kuhad, 19 Nov, Bengaluru. Early-bird tickets from Rs 1,499. Book by 3 Nov 2026 for the early-bird price."
+    },
+    {
+      "from": "Passport Seva <noreply@passportindia.example>",
+      "received": "2026-10-22T10:00:00+05:30",
+      "subject": "Appointment confirmed",
+      "snippet": "Your passport renewal appointment is confirmed. Bring your documents to PSK Koramangala. Submit by 18 Nov 2026, 11:00."
+    },
+    {
+      "from": "Amazon.in <shipment@amazon.example>",
+      "received": "2026-10-29T14:20:00+05:30",
+      "subject": "Delivered: your order",
+      "snippet": "Your package with Logitech MX Master 3S was delivered."
+    },
+    {
+      "from": "LinkedIn <jobs@linkedin.example>",
+      "received": "2026-10-30T06:45:00+05:30",
+      "subject": "3 new jobs for you",
+      "snippet": "Backend Engineer roles in Bengaluru match your profile."
+    },
+    {
+      "from": "Zomato <noreply@zomato.example>",
+      "received": "2026-10-28T21:30:00+05:30",
+      "subject": "Your weekend offer",
+      "snippet": "Flat 40% off on your next 3 orders this weekend."
     }
   ]
 }

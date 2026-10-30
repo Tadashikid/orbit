@@ -8,6 +8,21 @@
     {"id": "e4", "title": "Quarterly review", "start": "2026-10-12T10:00:00+05:30", "end": "2026-10-12T11:00:00+05:30"},
     {"id": "e5", "title": "Badminton (Playo)", "start": "2026-10-13T07:00:00+05:30", "end": "2026-10-13T08:00:00+05:30"},
     {"id": "e6", "title": "Badminton (Playo)", "start": "2026-10-15T07:00:00+05:30", "end": "2026-10-15T08:00:00+05:30"},
-    {"id": "e7", "title": "Dinner + board games with friends", "start": "2026-10-17T19:30:00+05:30", "end": "2026-10-17T23:00:00+05:30"}
+    {"id": "e7", "title": "Dinner + board games with friends", "start": "2026-10-17T19:30:00+05:30", "end": "2026-10-17T23:00:00+05:30"},
+    {"id": "e8", "title": "Guitar class (trial)", "start": "2026-10-14T19:00:00+05:30", "end": "2026-10-14T20:00:00+05:30"},
+    {"id": "e9", "title": "Dentist - Dr. Rao", "start": "2026-10-21T18:30:00+05:30", "end": "2026-10-21T19:15:00+05:30"},
+    {"id": "e10", "title": "Coorg trip with college friends", "start": "2026-10-24T06:00:00+05:30", "end": "2026-10-25T21:00:00+05:30"},
+    {"id": "e11", "title": "1:1 with manager", "start": "2026-10-28T15:00:00+05:30", "end": "2026-10-28T15:30:00+05:30"},
+    {"id": "e12", "title": "Badminton (Playo)", "start": "2026-10-30T07:00:00+05:30", "end": "2026-10-30T08:00:00+05:30"},
+    {"id": "e13", "title": "Mom's birthday brunch", "start": "2026-11-01T10:30:00+05:30", "end": "2026-11-01T13:00:00+05:30"},
+    {"id": "e14", "title": "Badminton (Playo)", "start": "2026-11-04T07:00:00+05:30", "end": "2026-11-04T08:00:00+05:30"},
+    {"id": "e15", "title": "Project proposal review", "start": "2026-11-06T16:00:00+05:30", "end": "2026-11-06T17:00:00+05:30"},
+    {"id": "e16", "title": "Sprint planning", "start": "2026-11-10T10:00:00+05:30", "end": "2026-11-10T11:30:00+05:30"},
+    {"id": "e17", "title": "Hackathon - Bengaluru", "start": "2026-11-14T09:00:00+05:30", "end": "2026-11-15T18:00:00+05:30"},
+    {"id": "e18", "title": "Concert - Prateek Kuhad", "start": "2026-11-19T19:00:00+05:30", "end": "2026-11-19T22:00:00+05:30"},
+    {"id": "e19", "title": "Bike service (Royal Enfield)", "start": "2026-11-25T09:30:00+05:30", "end": "2026-11-25T11:00:00+05:30"},
+    {"id": "e20", "title": "Cousin's wedding - Mysuru", "start": "2026-12-05T08:00:00+05:30", "end": "2026-12-06T22:00:00+05:30"},
+    {"id": "e21", "title": "Team offsite", "start": "2026-12-11T09:00:00+05:30", "end": "2026-12-11T18:00:00+05:30"},
+    {"id": "e22", "title": "Christmas at home - Kochi", "start": "2026-12-24T08:00:00+05:30", "end": "2026-12-27T20:00:00+05:30"}
   ]
 }

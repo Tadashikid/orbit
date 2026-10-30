@@ -111,9 +111,10 @@ def test_calendar_weekend_free_after_friday_party():
 
 def test_gmail_returns_only_deadline_emails_masked():
     r = gmail_server.list_tasks()
-    assert [t["deadline"][:10] for t in r["tasks"]] == ["2026-10-09", "2026-10-12", "2026-10-12", "2026-10-20"]
+    assert [t["deadline"][:10] for t in r["tasks"]] == ["2026-10-09", "2026-10-12", "2026-10-12", "2026-10-20", "2026-11-01",
+                                                    "2026-11-02", "2026-11-05", "2026-11-06", "2026-11-12", "2026-11-18"]
     text = json.dumps(r)
-    for leak in ("@", "778812345", "Swiggy", "Meghana"):  # addresses, policy number, non-task email
+    for leak in ("@", "778812345", "4402198765", "Swiggy", "Meghana", "LinkedIn"):  # addresses, account numbers, non-task email
         assert leak not in text
     # The injection arrives as plain data; Guardian (not this server) stops any write the email asks for.
     assert any("Ignore all previous instructions" in t["snippet"] for t in r["tasks"])
