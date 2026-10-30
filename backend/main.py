@@ -353,7 +353,8 @@ class Phone(BaseModel):
 
 @app.get("/me/phone")
 def my_phone(request: Request):
-    return {"phone": store.secret(_user(request), "phone"), "alerts": alerts.CHANNEL if alerts.SID else None}
+    return {"phone": store.secret(_user(request), "phone"), "alerts": alerts.CHANNEL if alerts.SID else None,
+            "join": alerts.join_link()}
 
 
 @app.post("/me/phone")

@@ -40,6 +40,12 @@ type AgentEvent =
   | { type: "done" }
   | { type: "approval"; action: Approval }
   | ({ type: "tool"; args?: Record<string, unknown>; error?: string; answer?: BackendAsk } & BackendTrace);
+// alerts: the channel, or null when Twilio isn't set up; join: wa.me link a new phone opens to join the sandbox
+export interface PhoneAlerts {
+  phone: string | null;
+  alerts: string | null;
+  join?: string | null;
+}
 export interface GoogleStatus {
   configured: boolean; // the backend has an OAuth client
   connected: boolean;
@@ -57,8 +63,8 @@ export interface OrbitApi {
   logout(): Promise<void>;
   deleteMe(): Promise<void>;
   // Your number for WhatsApp / SMS booking alerts; alerts = the channel, or null when Twilio isn't set up
-  phone(): Promise<{ phone: string | null; alerts: string | null }>;
-  setPhone(phone: string): Promise<{ phone: string | null; alerts: string | null }>; // Delete my data: everything Orbit keeps for you, and your account; signs you out
+  phone(): Promise<PhoneAlerts>;
+  setPhone(phone: string): Promise<PhoneAlerts>; // Delete my data: everything Orbit keeps for you, and your account; signs you out
   // Your own Google Calendar + Gmail, read-only: connecting is a page visit to /api/google/connect (Google's screen).
   googleStatus(): Promise<GoogleStatus>;
   disconnectGoogle(): Promise<GoogleStatus>;
@@ -310,10 +316,10 @@ export const api: OrbitApi = {
     await call("/logout", {});
   },
   async phone() {
-    return call<{ phone: string | null; alerts: string | null }>("/me/phone");
+    return call<PhoneAlerts>("/me/phone");
   },
   async setPhone(phone) {
-    return call<{ phone: string | null; alerts: string | null }>("/me/phone", { phone });
+    return call<PhoneAlerts>("/me/phone", { phone });
   },
   async deleteMe() {
     session = null;
