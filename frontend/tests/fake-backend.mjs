@@ -98,6 +98,10 @@ export function fakeBackend({ finance = false, statement = false, signedIn = tru
       state.signedIn = true;
       return json({ email: DEMO_EMAIL, name: "Manu" });
     }
+    if (method === "POST" && path === "/me/delete") {
+      state.signedIn = false;
+      return json({ deleted: true });
+    }
     if (method === "POST" && path === "/logout") {
       state.signedIn = false;
       return json({ ok: true });

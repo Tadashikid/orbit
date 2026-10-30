@@ -21,8 +21,8 @@ def test_hot_plug_adds_finance_tools():
     reg.plug("finance")
     after = asyncio.run(reg.discover())
     added = {t["name"] for t in after["tools"]} - {t["name"] for t in before["tools"]}
-    assert added == {f"finance__{n}" for n in ("load_statement", "get_balance", "get_sips", "get_spending_summary", "get_cost_table")}
-    assert [t["name"] for t in after["tools"] if not t["read_only"]] == ["finance__load_statement"]
+    assert added == {f"finance__{n}" for n in ("load_statement", "forget_statement", "get_balance", "get_sips", "get_spending_summary", "get_cost_table")}
+    assert [t["name"] for t in after["tools"] if not t["read_only"]] == ["finance__load_statement", "finance__forget_statement"]
 
 
 def test_call_routing_and_failures():

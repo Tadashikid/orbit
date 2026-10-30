@@ -110,6 +110,15 @@ def all_actions(owner, limit=50):
 
 
 
+def forget_owner(owner):
+    """Delete my data: every conversation, booking card and secret of `owner`."""
+    con = _db()
+    with con:
+        for table in ("turns", "actions", "secrets"):
+            con.execute(f"DELETE FROM {table} WHERE owner = ?", (owner,))
+    con.close()
+
+
 # Secrets, one per (owner, name): already encrypted by the caller (google_link.py), stored as they come.
 def save_secret(owner, name, value):
     con = _db()
@@ -134,5 +143,5 @@ def forget_secret(owner, name):
 
 # FIREBASE_SERVICE_ACCOUNT set: the same functions, kept in Firestore instead (backend/store_firestore.py).
 if os.getenv("FIREBASE_SERVICE_ACCOUNT"):
-    from store_firestore import (add_action, add_turn, all_actions, forget_secret, get_action, history,  # noqa: E402,F401,F811
-                                 move, save_secret, secret)
+    from store_firestore import (add_action, add_turn, all_actions, forget_owner, forget_secret,  # noqa: E402,F401,F811
+                                 get_action, history, move, save_secret, secret)

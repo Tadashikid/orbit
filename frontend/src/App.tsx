@@ -5,6 +5,7 @@ import {
   CalendarCheck,
   Info,
   LogOut,
+  UserX,
   Mic,
   MessageCircle,
   SlidersHorizontal,
@@ -125,6 +126,17 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
   useEffect(() => {
     api.googleStatus().then(setGoogle, () => undefined);
   }, []);
+  const deleteMe = async () => {
+    if (!confirm("Delete your Orbit account and everything it keeps? Your conversations, booking cards, bank statement " +
+        "and Google connection go, and you're signed out. Bookings already confirmed stay with the airline or hotel. " +
+        "This can't be undone.")) return;
+    try {
+      await api.deleteMe();
+      onSignOut?.();
+    } catch (e) {
+      alert(`Couldn't delete your data: ${(e as Error).message}`);
+    }
+  };
   const toggleGoogle = async () => {
     if (!google?.connected) return void location.assign("/api/google/connect");
     if (!confirm(`Disconnect ${google.email}? Orbit goes back to the sample calendar and inbox.`)) return;
@@ -467,6 +479,11 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
           {onSignOut && (
             <button className="discreet-button" aria-label="Sign out" title="Sign out" onClick={onSignOut}>
               <LogOut size={20} />
+            </button>
+          )}
+          {onSignOut && (
+            <button className="discreet-button" aria-label="Delete my data" title="Delete my data" onClick={deleteMe}>
+              <UserX size={20} />
             </button>
           )}
         </div>

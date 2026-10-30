@@ -8,6 +8,7 @@ WS   /voice                            -> talk to Orbit: mic audio in, spoken re
 GET  /actions                          -> every booking the agent prepared, newest first (expired holds marked)
 POST /actions/{id}/approve {"hash"}    -> confirm a hold the agent prepared (sandbox: nothing is charged)
 POST /actions/{id}/decline             -> let it go
+POST /me/delete                        -> delete my data: conversations, bookings, statement, Google link, my account
 GET  /google/connect, /google/callback -> link your own Google Calendar + Gmail, read-only (backend/google_link.py)
 GET  /google/status, POST /google/disconnect
 POST /ask {"question", "session_id"?}  -> {"verdict", "explanation", "trace", "planner", "model", "offline", "session_id"}
@@ -60,7 +61,13 @@ TODAY = date.fromisoformat(os.getenv("ORBIT_TODAY") or date.today().isoformat())
 GEMINI = agent.make_generate()  # None without GEMINI_API_KEY -> rules planner only
 
 app = FastAPI(title="Orbit")
-registry = Registry(plugged=("calendar", "gmail", "travel", "price", "booking"))  # ponytail: one shared registry = one user (demo)
+DEFAULT_PLUGGED = ("calendar", "gmail", "travel", "price", "booking")
+# Each account has its own On/Off switches. ponytail: in memory, so they're back to the defaults after a restart.
+_registries = {}
+
+
+def registry_for(owner):
+    return _registries.setdefault(owner, Registry(plugged=DEFAULT_PLUGGED))
 
 # Demo login: one account from .env, a signed httpOnly cookie, every other endpoint behind it. No password set = no way in.
 # ponytail: one hard-coded user, no rate limit: a fallback for offline demos. Google sign-in (below) is the real one.
@@ -215,10 +222,17 @@ def google_disconnect(request: Request):
     return google_link.status(_user(request))
 
 
-async def _read(owner, name, args):
-    """A tool call; Calendar and Gmail read `owner`'s own Google when they connected it (sample data otherwise)."""
-    token = owner and name.partition("__")[0] in ("calendar", "gmail") and await asyncio.to_thread(google_link.access_token, owner)
-    return await registry.call(name, args, {"google_token": token} if token else None)
+async def _read(owner, name, args=None, reg=None):
+    """A tool call for `owner`, through their own switches. In the request's _meta (never the args, so never the model,
+    trace or audit log): Finance gets whose statement to use; Calendar and Gmail get `owner`'s own Google token when
+    they connected it (sample data otherwise)."""
+    server, meta = name.partition("__")[0], {}
+    if server == "finance" and owner:
+        meta["owner"] = owner
+    if server in ("calendar", "gmail") and owner:
+        token = await asyncio.to_thread(google_link.access_token, owner)
+        meta |= {"google_token": token} if token else {}
+    return await (reg or registry_for(owner)).call(name, args, meta or None)
 
 
 SESSION_ID = r"^[0-9a-f]{32}$"
@@ -239,35 +253,36 @@ class Statement(BaseModel):
     sample: str | None = Field(None, pattern=r"^[a-z0-9_]{1,60}$")  # a file name in data/samples, nothing else
 
 
-async def _finance(tool, args=None):
-    """User actions on the Finance server. Never reachable from the model's tool loop."""
-    if "finance" not in registry.plugged:
+async def _finance(owner, tool, args=None):
+    """User actions on the Finance server, on `owner`'s statement. Never reachable from the model's tool loop."""
+    if "finance" not in registry_for(owner).plugged:
         raise HTTPException(409, "Plug in Finance first")
-    r = await registry.call(f"finance__{tool}", args)
+    r = await _read(owner, f"finance__{tool}", args)
     if not r["ok"]:
         raise HTTPException(502, r["error"])
     return r["result"]
 
 
 @app.get("/balance")
-async def get_balance():
-    return await _finance("get_balance")
+async def get_balance(request: Request):
+    return await _finance(_user(request), "get_balance")
 
 
-async def _summary():
+async def _summary(owner):
     """What the UI shows about the loaded statement: monthly spend by category, commitments and the forecast."""
-    s = await _finance("get_spending_summary", {"days": 30})
+    s = await _finance(owner, "get_spending_summary", {"days": 30})
     keep = ("monthly_avg_spend", "monthly_avg_by_category", "monthly_commitments", "recurring", "forecast", "as_of")
     return {k: s.get(k) for k in keep}
 
 
 @app.get("/statement")
-async def get_statement():
-    """The loaded statement's balance and summary; null while Finance is off or no statement is loaded yet."""
-    if "finance" not in registry.plugged:
+async def get_statement(request: Request):
+    """Your statement's balance and summary; null while Finance is off or you haven't uploaded one yet."""
+    me = _user(request)
+    if "finance" not in registry_for(me).plugged:
         return None
-    r = await registry.call("finance__get_balance")
-    return {**r["result"], "summary": await _summary()} if r["ok"] else None
+    r = await _read(me, "finance__get_balance")
+    return {**r["result"], "summary": await _summary(me)} if r["ok"] else None
 
 
 @app.get("/statement/samples")
@@ -276,7 +291,7 @@ def statement_samples():
 
 
 @app.post("/statement")
-async def upload_statement(body: Statement):
+async def upload_statement(body: Statement, request: Request):
     """You uploading the file IS the approval Guardian requires for Finance's load_statement write tool.
     The raw file is masked in memory and never stored; Finance only ever receives date/category/debit/credit/balance."""
     if body.sample:
@@ -292,13 +307,15 @@ async def upload_statement(body: Statement):
         masked, receipt = statement_import.mask_text(text)
     except ValueError as e:
         raise HTTPException(422, str(e)) from None
-    loaded = await _finance("load_statement", {"statement": masked})
-    return {"receipt": receipt, **loaded, "summary": await _summary()}
+    me = _user(request)
+    loaded = await _finance(me, "load_statement", {"statement": masked})
+    return {"receipt": receipt, **loaded, "summary": await _summary(me)}
 
 
 @app.get("/servers")
-async def servers():
-    """Every server Orbit knows: plugged in (On) or not, reachable, and the tools it announced over tools/list."""
+async def servers(request: Request):
+    """Every server Orbit knows: On for you or not, reachable, and the tools it announced over tools/list."""
+    registry = registry_for(_user(request))
     catalogue = await registry.discover()
     tools = defaultdict(list)
     for t in catalogue["tools"]:
@@ -315,17 +332,32 @@ def _known(name):
 
 
 @app.post("/servers/{name}/plug")
-async def plug(name: str):
+async def plug(name: str, request: Request):
     _known(name)
-    registry.plug(name)
-    return await servers()
+    registry_for(_user(request)).plug(name)
+    return await servers(request)
 
 
 @app.post("/servers/{name}/unplug")
-async def unplug(name: str):
+async def unplug(name: str, request: Request):
     _known(name)
-    registry.unplug(name)
-    return await servers()
+    registry_for(_user(request)).unplug(name)
+    return await servers(request)
+
+
+@app.post("/me/delete")
+async def delete_me(request: Request, response: Response):
+    """Delete my data: conversations, booking cards, your statement, your Google link (revoked with Google) and your
+    sign-in account. Bookings already confirmed with a provider stay with that provider. Then you're signed out."""
+    me = _user(request)
+    await asyncio.to_thread(google_link.disconnect, me)  # revoke first, while the token can still be read
+    await _read(me, "finance__forget_statement", reg=Registry(plugged=("finance",)))  # even with Finance switched off
+    await asyncio.to_thread(store.forget_owner, me)
+    _registries.pop(me, None)
+    guardian.audit("delete my data", [{"server": "orbit", "tool": "delete_my_data", "args": {}, "by": "you",
+                                       "guardian": "requested by you", "error": None}])
+    response.delete_cookie(COOKIE)
+    return {"deleted": True}
 
 
 def _key(name, args):
@@ -412,7 +444,7 @@ BOOK = re.compile(r"\b(book|hold|reserve|order|buy it|get it)\b", re.I)
 
 
 async def _agent_events(goal, history, session=None, owner=None):
-    tools = (await registry.discover())["tools"] + [agent.PLAN_TOOL]
+    tools = (await registry_for(owner).discover())["tools"] + [agent.PLAN_TOOL]
     guard = guardian.Guard(tools, goal)
     trace, approvals = [], []
 
@@ -542,7 +574,7 @@ async def approve(action_id: str, body: Approval, request: Request):
         raise HTTPException(403, f"Over your approval limit of Rs {MAX_APPROVAL:,}. Buy it yourself: use the store link on the card.")
     if not store.move(_user(request), action_id, "pending", "approving"):
         raise HTTPException(409, f"This hold is already {a['status']}")
-    r = await registry.call("booking__confirm_hold", {"hold_id": a["hold_id"]})
+    r = await _read(_user(request), "booking__confirm_hold", {"hold_id": a["hold_id"]})
     row = {"server": "booking", "tool": "confirm_hold", "args": {"hold_id": a["hold_id"]}, "by": "you",
            "guardian": "approved by you", "error": None if r["ok"] else r["error"][:200]}
     guardian.audit(f"approve: {a['summary']}", [row])
@@ -560,7 +592,7 @@ async def decline(action_id: str, request: Request):
     a = _action_or_404(request, action_id)
     if not store.move(_user(request), action_id, "pending", "declined"):
         raise HTTPException(409, f"This hold is already {a['status']}")
-    await registry.call("booking__release_hold", {"hold_id": a["hold_id"]})  # best effort: holds expire anyway
+    await _read(_user(request), "booking__release_hold", {"hold_id": a["hold_id"]})  # best effort: holds expire anyway
     guardian.audit(f"decline: {a['summary']}", [{"server": "booking", "tool": "release_hold", "args": {"hold_id": a["hold_id"]},
                                                  "by": "you", "guardian": "declined by you", "error": None}])
     return _public(store.get_action(_user(request), action_id))
@@ -568,7 +600,7 @@ async def decline(action_id: str, request: Request):
 
 async def run_question(question, history=(), explain=True, owner=None):
     """One question through the whole pipeline: understand, read (Guardian on every call), engine, explain."""
-    catalogue = await registry.discover()
+    catalogue = await registry_for(owner).discover()
     tools = catalogue["tools"]
 
     guard = guardian.Guard(tools, question)

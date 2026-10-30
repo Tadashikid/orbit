@@ -19,7 +19,7 @@ LOCKED = {
     "travel": {"search_flights", "search_hotels"},
     "calendar": {"list_events", "find_free_slots"},
     "gmail": {"list_tasks", "get_deadlines"},
-    "finance": {"load_statement", "get_balance", "get_sips", "get_spending_summary", "get_cost_table"},
+    "finance": {"load_statement", "forget_statement", "get_balance", "get_sips", "get_spending_summary", "get_cost_table"},
 }
 
 
@@ -35,7 +35,7 @@ def test_locked_tool_names_and_write_flags():
         tools = asyncio.run(server.mcp.list_tools())
         assert {t.name for t in tools} == LOCKED[server.mcp.name]
         writes = {t.name for t in tools if not t.annotations.readOnlyHint}
-        assert writes == ({"load_statement"} if server.mcp.name == "finance" else set())
+        assert writes == ({"load_statement", "forget_statement"} if server.mcp.name == "finance" else set())
 
 
 def test_finance_reads_the_uploaded_statement(monkeypatch, statement):

@@ -28,7 +28,7 @@ POLICY = {
     "gmail__list_tasks": "private", "gmail__get_deadlines": "private",
     "finance__get_balance": "private", "finance__get_sips": "private",
     "finance__get_spending_summary": "private", "finance__get_cost_table": "private",
-    "finance__load_statement": "write",
+    "finance__load_statement": "write", "finance__forget_statement": "write",
     "travel__search_flights": "outbound", "travel__search_hotels": "outbound",
     "price__check_price": "outbound",
     # prepare: reversible holds (no money moves). Only after the engine cleared a plan in this same goal.

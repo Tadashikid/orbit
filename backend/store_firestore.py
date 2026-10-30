@@ -18,7 +18,8 @@ from firebase_admin import credentials, firestore
 from google.cloud.firestore_v1 import transactional
 
 KEY = Path(__file__).resolve().parents[1] / os.environ["FIREBASE_SERVICE_ACCOUNT"]
-db = firestore.client(firebase_admin.initialize_app(credentials.Certificate(KEY), name="orbit-store"))
+APP = firebase_admin.initialize_app(credentials.Certificate(KEY), name="orbit-store")
+db = firestore.client(APP)
 
 
 def _now():
@@ -90,3 +91,14 @@ def secret(owner, name):
 
 def forget_secret(owner, name):
     _user(owner).collection("secrets").document(name).delete()
+
+
+def forget_owner(owner):
+    """Delete my data: everything under users/{email}, and the sign-in account itself (Firebase Auth)."""
+    from firebase_admin import auth
+
+    db.recursive_delete(_user(owner))
+    try:
+        auth.delete_user(auth.get_user_by_email(owner, app=APP).uid, app=APP)
+    except auth.UserNotFoundError:  # the demo login has no Firebase account
+        pass

@@ -25,8 +25,11 @@ def client(monkeypatch):
     monkeypatch.setattr(main, "GEMINI", None)  # tests never call the real model (see test_gemini_cannot_write)
     c = TestClient(main.app)
     assert c.post("/login", json={"email": main.DEMO_EMAIL, "password": main.DEMO_PASSWORD}).status_code == 200
+    c.post("/servers/finance/plug")  # each account has its own statement: the demo account gets Manu's
+    assert c.post("/statement", json={"sample": "manu_statement"}).status_code == 200
+    c.post("/servers/finance/unplug")
     yield c
-    main.registry.unplug("finance")
+    main._registries.clear()  # every test starts with the default switches
 
 
 def test_gemini_cannot_write_and_numbers_stay_canonical(client, monkeypatch):
@@ -90,7 +93,7 @@ def test_servers_announce_their_tools(client):
     assert {t["name"] for t in s["travel"]["tools"]} == {"search_flights", "search_hotels"}
     plugged = {x["name"]: x for x in client.post("/servers/finance/plug").json()["servers"]}["finance"]
     assert plugged["status"] == "connected"
-    assert [t["name"] for t in plugged["tools"] if not t["read_only"]] == ["load_statement"]
+    assert [t["name"] for t in plugged["tools"] if not t["read_only"]] == ["load_statement", "forget_statement"]
 
 
 def test_sample_statements_load_by_name(client):
@@ -342,18 +345,18 @@ def test_google_tokens_are_encrypted_per_account(monkeypatch):
 
 def test_your_google_token_goes_only_to_calendar_and_gmail(client, monkeypatch):
     """Connected: Calendar and Gmail get your token in the request's _meta. Never in args, the trace or other servers."""
-    sent, real = [], main.registry.call
+    sent, real = [], main.Registry.call
 
-    async def spy(name, args=None, meta=None):
+    async def spy(self, name, args=None, meta=None):
         sent.append((name.partition("__")[0], meta))
-        return await real(name, args, meta)
+        return await real(self, name, args, meta)
 
-    monkeypatch.setattr(main.registry, "call", spy)
+    monkeypatch.setattr(main.Registry, "call", spy)
     monkeypatch.setattr(main.google_link, "access_token", lambda owner: f"token-of-{owner}")
     d = client.post("/ask", json=Q).json()
     mine = {"google_token": f"token-of-{main.DEMO_EMAIL}"}
     assert {s for s, m in sent if m == mine} == {"calendar", "gmail"}
-    assert all(m is None for s, m in sent if s not in ("calendar", "gmail"))
+    assert all("google_token" not in (m or {}) for s, m in sent if s not in ("calendar", "gmail"))
     assert "token-of" not in json.dumps(d)  # not in the answer, the trace or the evidence
 
 
@@ -418,3 +421,42 @@ def test_shopping_cards_link_to_the_store_page_https_only():
     assert "link" not in sneaky  # only a real web page becomes a button
     stay = store.add_action("shop@x.com", "s1", hold | {"kind": "stay"})
     assert "link" not in stay
+
+
+def _second_account(monkeypatch, email="someone@gmail.com"):
+    monkeypatch.setattr(main, "FIREBASE_PROJECT_ID", "orbit-test")
+    monkeypatch.setattr(main, "ALLOWED", {"*"})
+    monkeypatch.setattr(main, "_verify_google", lambda t: {"email": email, "email_verified": True})
+    other = TestClient(main.app)
+    assert other.post("/auth/google", json={"id_token": "x" * 20}).status_code == 200
+    return other
+
+
+def test_each_account_has_its_own_statement_and_switches(client, monkeypatch):
+    other = _second_account(monkeypatch)
+    other.post("/servers/finance/plug")
+    assert other.get("/statement").json() is None  # a new account sees no one else's money
+    assert {s["name"]: s["plugged"] for s in client.get("/servers").json()["servers"]}["finance"] is False  # my switch
+    assert other.post("/statement", json={"sample": "manu_statement_spend_30k"}).json()["balance"] == 94861
+    client.post("/servers/finance/plug")
+    assert client.get("/statement").json()["balance"] == STATEMENT_BALANCE  # mine is untouched
+
+
+def test_delete_my_data_clears_everything_and_signs_out(client, monkeypatch):
+    import store
+
+    other = _second_account(monkeypatch, "leaving@gmail.com")
+    revoked = []
+    monkeypatch.setattr(main.google_link, "disconnect", lambda owner: revoked.append(owner))
+    other.post("/servers/finance/plug")
+    other.post("/statement", json={"sample": "manu_statement"})
+    other.post("/ask", json=Q)
+    store.save_secret("leaving@gmail.com", "google", "encrypted-blob")
+    assert other.post("/me/delete").json() == {"deleted": True}
+    assert revoked == ["leaving@gmail.com"] and other.get("/me").status_code == 401  # Google revoked, signed out
+    assert store.secret("leaving@gmail.com", "google") is None and store.all_actions("leaving@gmail.com") == []
+    again = _second_account(monkeypatch, "leaving@gmail.com")
+    again.post("/servers/finance/plug")
+    assert again.get("/statement").json() is None  # the statement is gone too
+    client.post("/servers/finance/plug")
+    assert client.get("/statement").json()["balance"] == STATEMENT_BALANCE  # nobody else's data was touched

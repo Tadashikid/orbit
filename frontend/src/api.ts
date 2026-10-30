@@ -55,6 +55,7 @@ export interface OrbitApi {
   authConfig(): Promise<{ google: boolean; demo: boolean }>; // which ways to sign in are on
   googleLogin(idToken: string): Promise<string>; // the backend checks it with Google and sets the session cookie
   logout(): Promise<void>;
+  deleteMe(): Promise<void>; // Delete my data: everything Orbit keeps for you, and your account; signs you out
   // Your own Google Calendar + Gmail, read-only: connecting is a page visit to /api/google/connect (Google's screen).
   googleStatus(): Promise<GoogleStatus>;
   disconnectGoogle(): Promise<GoogleStatus>;
@@ -304,6 +305,10 @@ export const api: OrbitApi = {
   async logout() {
     session = null;
     await call("/logout", {});
+  },
+  async deleteMe() {
+    session = null;
+    await call("/me/delete", {});
   },
   async googleStatus() {
     return call<GoogleStatus>("/google/status");

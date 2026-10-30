@@ -7,6 +7,7 @@ the backend (date, category, debit, credit, balance only; narration and mode nev
 Run:  .venv\\Scripts\\python mcp_servers\\finance_server.py
 """
 import csv
+import hashlib
 import io
 import json
 import os
@@ -14,12 +15,14 @@ from collections import Counter, defaultdict
 from datetime import date, timedelta
 from pathlib import Path
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 
 DATA = Path(__file__).resolve().parents[1] / "data"
 # The session's statement (gitignored). ORBIT_STATEMENT points tests at their own copy.
 STATEMENT = Path(os.getenv("ORBIT_STATEMENT") or DATA / "session" / "statement.csv")
+# One statement per Orbit account, named by a hash of its email: the backend names the account in each request's _meta.
+STATEMENTS = STATEMENT.parent / "statements"
 COST_TABLE = DATA / "cost_table.json"
 COLUMNS = ["date", "category", "debit", "credit", "balance"]  # = statement_import.KEEP
 RECENT_DAYS = 28  # the spending "level": what you've spent on each category lately
@@ -30,11 +33,19 @@ READ = ToolAnnotations(readOnlyHint=True)
 mcp = FastMCP("finance", port=8103 + int(os.getenv("ORBIT_PORT_OFFSET", "0")))  # tests use their own ports
 
 
-def _rows():
+def _statement(ctx=None):
+    """This request's statement file: the account the backend named in _meta; without one (tests, scripts) the
+    single-user file. A new account has none until it uploads its own: never someone else's."""
+    meta = ctx and ctx.request_context.meta
+    owner = (meta.model_extra or {}).get("owner") if meta else None
+    return STATEMENTS / f"{hashlib.sha256(owner.encode()).hexdigest()[:32]}.csv" if owner else STATEMENT
+
+
+def _rows(path=STATEMENT):
     """(date, category, amount, is_income, balance) for every statement row, oldest first."""
-    if not STATEMENT.exists():
+    if not path.exists():
         raise ValueError("No bank statement uploaded yet: upload one in the Orbit app")
-    with open(STATEMENT, encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         rows = [(date.fromisoformat(r["date"]), r["category"], float(r["debit"] or r["credit"]), not r["debit"], float(r["balance"]))
                 for r in csv.DictReader(f)]
     return sorted(rows, key=lambda r: r[0])  # stable: same-day rows keep the bank's order, so the last balance is the latest
@@ -108,7 +119,7 @@ def _backtest(rows, recurring):
 
 
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True))
-def load_statement(statement: str) -> dict:
+def load_statement(statement: str, ctx: Context = None) -> dict:
     """Replace this session's bank statement with a MASKED one (CSV columns exactly: date,category,debit,credit,balance).
     Write tool: only the user's own upload in the Orbit app may call it, never the AI."""
     if len(statement) > 2_000_000:
@@ -128,24 +139,39 @@ def load_statement(statement: str) -> dict:
         rows.append(r)
     if not rows:
         raise ValueError("the statement has no rows")
-    STATEMENT.parent.mkdir(parents=True, exist_ok=True)
-    tmp = STATEMENT.with_suffix(".tmp")
+    path = _statement(ctx)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
     tmp.write_text(statement, encoding="utf-8")
-    tmp.replace(STATEMENT)
-    return {"success": True, "rows": len(rows), **get_balance(), "from": _rows()[0][0].isoformat()}
+    tmp.replace(path)
+    return {"success": True, "rows": len(rows), **_balance(path), "from": _rows(path)[0][0].isoformat()}
 
 
-@mcp.tool(annotations=READ)
-def get_balance() -> dict:
-    """Current bank balance: the running balance on the last row of the uploaded statement. Orbit has no bank access."""
-    d, *_, balance = _rows()[-1]
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True))
+def forget_statement(ctx: Context = None) -> dict:
+    """Delete this account's statement ("Delete my data"). Write tool: only the user's own request, never the AI."""
+    path = _statement(ctx)
+    if path == STATEMENT:
+        raise ValueError("no account named: nothing deleted")
+    path.unlink(missing_ok=True)
+    return {"deleted": True}
+
+
+def _balance(path):
+    d, *_, balance = _rows(path)[-1]
     return {"balance": balance, "currency": "INR", "as_of": d.isoformat(), "source": "statement_csv"}
 
 
 @mcp.tool(annotations=READ)
-def get_sips() -> dict:
+def get_balance(ctx: Context = None) -> dict:
+    """Current bank balance: the running balance on the last row of the uploaded statement. Orbit has no bank access."""
+    return _balance(_statement(ctx))
+
+
+@mcp.tool(annotations=READ)
+def get_sips(ctx: Context = None) -> dict:
     """Recurring SIP investments found in the statement: amount and day of month."""
-    rows = _rows()
+    rows = _rows(_statement(ctx))
     months = defaultdict(set)
     for d, cat, amt, income, _ in rows:
         if cat == "Investments (SIP)" and not income:
@@ -155,12 +181,12 @@ def get_sips() -> dict:
 
 
 @mcp.tool(annotations=READ)
-def get_spending_summary(days: int = 30) -> dict:
+def get_spending_summary(days: int = 30, ctx: Context = None) -> dict:
     """Spending by category over the last `days` days of the statement, monthly averages, and the forecast model:
     recurring items (salary, rent, SIPs, bills) and everyday spending per category per weekday, with its back-test."""
     if not 1 <= days <= 366:
         raise ValueError("days must be between 1 and 366")
-    rows = _rows()
+    rows = _rows(_statement(ctx))
     start, end = rows[0][0], rows[-1][0]
     span = (end - start).days + 1
     window, monthly = defaultdict(float), defaultdict(float)
