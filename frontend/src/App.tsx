@@ -1,11 +1,13 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Eye,
   Info,
   LogOut,
+  Mic,
   MessageCircle,
   SlidersHorizontal,
+  Square,
   Ticket,
   Wallet,
   ShieldCheck,
@@ -27,6 +29,7 @@ import { ConnectDialog, SetupDialog } from "./screens/Dialogs";
 import { Skeleton, Button, Chip, Modal, AnimatedAmount } from "./components/ui";
 import { api } from "./api";
 import { useDecision } from "./hooks/useDecision";
+import { Voice, voiceSummary, type VoiceEvent } from "./voice";
 import type { Approval, Server, StatementInfo } from "./types";
 export const HERO = "Can I afford a Goa trip next weekend?";
 const prompts = [
@@ -192,7 +195,59 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
     setAsked(text);
     setHighlight("");
     setTab("verdict");
-    void d.run(text, servers, slow, quick);
+    return d.run(text, servers, slow, quick);
+  };
+  // Voice (src/voice.ts): Gemini Live listens and speaks; every request it hears runs here, exactly like typing.
+  const voiceRef = useRef<Voice | null>(null);
+  const [voice, setVoice] = useState<"off" | "listening" | "thinking" | "speaking" | "ready">("off");
+  const [caption, setCaption] = useState("");
+  const [voiceError, setVoiceError] = useState("");
+  const heard = useRef("");
+  const onVoice = useRef<(e: VoiceEvent) => void>(() => undefined);
+  onVoice.current = (e) => {
+    if (e.type === "heard") {
+      heard.current += e.text;
+      setQuestion(heard.current.trim());
+    } else if (e.type === "ask") {
+      setVoice("thinking");
+      setCaption("");
+      void Promise.resolve(ask(e.request)).then((r) => voiceRef.current?.result(e.id, voiceSummary(r ?? null)));
+    } else if (e.type === "said") {
+      setVoice("speaking");
+      setCaption((c) => c + e.text);
+    } else if (e.type === "turn_done") {
+      setVoice((v) => (v === "listening" ? v : "ready"));
+    } else if (e.type === "interrupted") {
+      voiceRef.current?.hush();
+    } else if (e.type === "error") {
+      setVoiceError(e.text);
+    } else if (e.type === "closed") {
+      setVoice("off");
+    }
+  };
+  useEffect(() => () => voiceRef.current?.close(), []);
+  const toggleMic = async () => {
+    setVoiceError("");
+    const v = (voiceRef.current ??= new Voice((e) => onVoice.current(e)));
+    if (voice === "listening") {
+      v.stop();
+      setVoice("thinking");
+      return;
+    }
+    try {
+      heard.current = "";
+      setCaption("");
+      await v.start();
+      setVoice("listening");
+    } catch (err) {
+      setVoiceError((err as Error).message || "Orbit can't use the microphone.");
+      setVoice(v.connected ? "ready" : "off");
+    }
+  };
+  const endVoice = () => {
+    voiceRef.current?.close();
+    setVoice("off");
+    setCaption("");
   };
   const notify = (message: string, action: () => void, label: string) =>
     setNudges((n) => [...n, { id: Date.now(), message, action, label }].slice(-3));
@@ -376,6 +431,16 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
                 }
               }}
             />
+            <button
+              type="button"
+              className={`mic-button mic-${voice}`}
+              onClick={() => void toggleMic()}
+              aria-pressed={voice === "listening"}
+              aria-label={voice === "listening" ? "Stop talking" : "Talk to Orbit"}
+              title={voice === "listening" ? "Stop talking" : "Talk to Orbit"}
+            >
+              {voice === "listening" ? <Square size={18} /> : <Mic size={20} />}
+            </button>
             <Button
               type="submit"
               tone="forest"
@@ -388,6 +453,30 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
           {askError && (
             <p className="field-error" role="alert">
               {askError}
+            </p>
+          )}
+          {voice !== "off" && (
+            <div className="voice-bar" role="status">
+              <span className={`voice-dot voice-dot-${voice}`} aria-hidden />
+              <div>
+                <strong>
+                  {{
+                    listening: "Listening… tap ■ when you're done",
+                    thinking: "Working on it…",
+                    speaking: "Orbit is speaking",
+                    ready: "Tap the mic to talk again",
+                  }[voice]}
+                </strong>
+                {caption && <p>“{caption.trim()}”</p>}
+              </div>
+              <button className="text-button" onClick={endVoice}>
+                End voice
+              </button>
+            </div>
+          )}
+          {voiceError && (
+            <p className="field-error" role="alert">
+              {voiceError}
             </p>
           )}
           <motion.div

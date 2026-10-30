@@ -122,6 +122,12 @@ try {
   assert.deepEqual(posted.at(-1), [`/api/actions/${card.id}/approve`, { hash: card.hash }]);
   globalThis.fetch = async (url) => new Response(JSON.stringify({ actions: [card] }), { status: String(url) === "/api/actions" ? 200 : 404 });
   assert.deepEqual(await api.actions(), [card]); // the Bookings window's list
+  // Voice: mic samples become 16-bit PCM (clamped), and the spoken summary always says holds need a tap.
+  const { toPcm16, voiceSummary } = await server.ssrLoadModule("/src/voice.ts");
+  assert.deepEqual([...new Int16Array(toPcm16(new Float32Array([0, 1, -1, 2, -2])))], [0, 32767, -32768, 32767, -32768]);
+  const spoken = voiceSummary(booked);
+  assert(spoken.startsWith(booked.wire.headline) && spoken.includes("1 option is on hold") && spoken.includes("taps Approve"));
+  assert.match(voiceSummary(null), /couldn't check/);
   // Never shows a malformed answer, never pretends when the backend is down.
   assert.throws(() => toResult({ verdict: { verdict: "maybe" } }, on), ApiError);
   globalThis.fetch = async () => {

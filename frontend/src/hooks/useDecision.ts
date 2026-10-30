@@ -44,7 +44,7 @@ export function useDecision() {
         const result = await api.decide(question, servers, (s) => {
           if (token.current === id) setStep(s);
         });
-        if (token.current !== id) return;
+        if (token.current !== id) return null;
         last.current = result;
         const next = presentVerdict(result);
         setPending(next);
@@ -71,7 +71,7 @@ export function useDecision() {
         finishRef.current = finish;
         if (reduced || quick) {
           timers.current.push(setTimeout(finish, quick ? 350 : 150));
-          return;
+          return result;
         }
         const factor = slow ? 2 : 1;
         const schedule = (ms: number, fn: () => void) => {
@@ -107,11 +107,13 @@ export function useDecision() {
           setTrace(result.trace);
         });
         schedule(3300, finish);
+        return result; // voice speaks a summary of it (src/voice.ts)
       } catch (e) {
         if (token.current === id) {
           setError((e as Error).message);
           setPhase("error");
         }
+        return null;
       }
     },
     [verdict, reduced],
