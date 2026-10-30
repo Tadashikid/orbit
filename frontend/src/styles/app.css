@@ -24,6 +24,7 @@
   border: var(--border);
   border-radius: 50%;
   background: var(--lime);
+  color: var(--mint-100); /* the eye: light on the dark-green circle, like the favicon */
   width: 48px;
   height: 48px;
   display: grid;

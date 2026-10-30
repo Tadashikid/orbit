@@ -89,7 +89,7 @@ body {
 }
 .calm-header .logo-mark {
   background: var(--forest-800);
-  color: var(--surface-primary);
+  color: var(--mint-100);
 }
 .landing h1 > .headline-mask {
   display: block;
