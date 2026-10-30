@@ -370,7 +370,7 @@ export default function App() {
             <div className="landing-progress" role="status">
               <span>
                 {d.phase === "discovering"
-                  ? "Looking at the information you allow…"
+                  ? d.step ? `${d.step}…` : "Looking at the information you allow…"
                   : d.phase === "calling"
                     ? "Checking your dates and budget…"
                     : "Bringing your plan together…"}

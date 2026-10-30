@@ -32,8 +32,16 @@ interface BackendAsk {
   intent: DecisionResult["intent"];
   offline: Record<string, string>;
 }
+// POST /agent streams these as server-sent events. A tool event for Orbit's own check_plan carries its full answer.
+type AgentEvent =
+  | { type: "session"; id: string }
+  | { type: "step" | "message"; text: string }
+  | { type: "done" }
+  | ({ type: "tool"; args?: Record<string, unknown>; error?: string; answer?: BackendAsk } & BackendTrace);
 export interface OrbitApi {
-  decide(question: string, servers: Server[]): Promise<DecisionResult>;
+  // `onStep` gets a short, human line for each step the agent takes, as it happens.
+  decide(question: string, servers: Server[], onStep?: (step: string) => void): Promise<DecisionResult>;
+  newConversation(): void;
   servers(): Promise<{ servers: Server[]; today: string }>;
   setSource(id: string, on: boolean): Promise<{ servers: Server[]; today: string }>;
   statement(): Promise<StatementInfo | null>;
@@ -47,6 +55,7 @@ const UI: Record<string, { id: string; name: string }> = {
   finance: { id: "finance", name: "Finance" },
   travel: { id: "travel", name: "Travel" },
   price: { id: "price", name: "Price Check" },
+  orbit: { id: "orbit", name: "Orbit" },
 };
 const ui = (backend: string) => UI[backend] ?? { id: backend, name: backend };
 const backendName = (id: string) =>
@@ -68,10 +77,9 @@ export class ApiError extends Error {
     super(message);
   }
 }
-async function call<T>(path: string, body?: unknown): Promise<T> {
-  let res: Response;
+async function send(path: string, body?: unknown): Promise<Response> {
   try {
-    res = await fetch(
+    return await fetch(
       `/api${path}`,
       body === undefined
         ? undefined
@@ -80,24 +88,75 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
   } catch {
     throw new ApiError("Can't reach Orbit. Is the backend running (backend/main.py)?", 0);
   }
-  const text = await res.text();
-  let data: unknown = null;
+}
+function parse(text: string): unknown {
   try {
-    data = text ? JSON.parse(text) : null;
+    return text ? JSON.parse(text) : null;
   } catch {
-    /* not JSON: reported below */
+    return null; // not JSON: reported by the caller
   }
-  if (!res.ok) {
-    const detail = (data as { detail?: unknown } | null)?.detail;
-    const message = typeof detail === "string"
-      ? detail
-      : Array.isArray(detail)
-        ? detail.map((d: { msg?: string }) => d.msg).join("; ")
-        : `Orbit API error ${res.status}`;
-    throw new ApiError(message, res.status);
-  }
+}
+function failure(data: unknown, status: number) {
+  const detail = (data as { detail?: unknown } | null)?.detail;
+  const message = typeof detail === "string"
+    ? detail
+    : Array.isArray(detail)
+      ? detail.map((d: { msg?: string }) => d.msg).join("; ")
+      : `Orbit API error ${status}`;
+  return new ApiError(message, status);
+}
+async function call<T>(path: string, body?: unknown): Promise<T> {
+  const res = await send(path, body);
+  const data = parse(await res.text());
+  if (!res.ok) throw failure(data, res.status);
   return data as T;
 }
+// Server-sent events over a POST (EventSource only does GET): one JSON object per "data: " line.
+async function stream(path: string, body: unknown, onEvent: (e: AgentEvent) => void) {
+  const res = await send(path, body);
+  if (!res.ok || !res.body) throw failure(parse(await res.text()), res.status);
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    buffer += value ?? "";
+    const chunks = buffer.split("\n\n");
+    buffer = done ? "" : (chunks.pop() ?? "");
+    for (const chunk of chunks)
+      for (const line of chunk.split("\n"))
+        if (line.startsWith("data: ")) onEvent(JSON.parse(line.slice(6)) as AgentEvent);
+    if (done) return;
+  }
+}
+// The conversation this tab is in. The backend keeps the turns; the UI only remembers which conversation it is.
+let session: string | null = null;
+const stepLabel = (e: Extract<AgentEvent, { type: "tool" }>) =>
+  e.guardian !== "allowed"
+    ? `Guardian stopped ${e.tool}`
+    : e.server === "orbit"
+      ? `Checked: ${String(e.args?.question ?? "your plan")}`
+      : `Read ${ui(e.server).name}`;
+// An agent answer that checked no plan ("what's on my calendar?") still shows as an answer card.
+const infoAnswer = (question: string, text: string): BackendAsk => ({
+  verdict: {
+    question,
+    verdict: "info",
+    headline: text || "Done.",
+    numbers: {
+      balance: null,
+      trip_cost: { low: null, high: null },
+      monthly_commitments: null,
+      remaining: { low: null, high: null },
+    },
+    evidence: [],
+    tradeoffs: [],
+    not_read: [],
+  },
+  explanation: null,
+  trace: [],
+  intent: null,
+  offline: {},
+});
 const toServers = (d: { servers: BackendServer[]; today: string }) => ({
   today: d.today,
   servers: d.servers.map((s) => ({
@@ -167,8 +226,27 @@ export function toResult(r: BackendAsk, servers: Server[]): DecisionResult {
   };
 }
 export const api: OrbitApi = {
-  async decide(question, servers) {
-    return toResult(await call<BackendAsk>("/ask", { question }), servers);
+  async decide(question, servers, onStep) {
+    // The agent loop: it may check several plans; the screen shows the last one, the agent's reply as the wording.
+    const plans: BackendAsk[] = [];
+    const trace: BackendTrace[] = [];
+    let reply = "";
+    await stream("/agent", { goal: question, ...(session ? { session_id: session } : {}) }, (e) => {
+      if (e.type === "session") session = e.id;
+      else if (e.type === "step") onStep?.(e.text);
+      else if (e.type === "message") reply = e.text;
+      else if (e.type === "tool") {
+        trace.push(e, ...(e.answer?.trace ?? []));
+        if (e.answer) plans.push(e.answer);
+        onStep?.(stepLabel(e));
+      }
+    });
+    const shown = plans.at(-1) ?? infoAnswer(question, reply);
+    const wording = reply && reply !== shown.verdict.headline ? reply : shown.explanation;
+    return toResult({ ...shown, explanation: wording, trace }, servers);
+  },
+  newConversation() {
+    session = null;
   },
   async servers() {
     return toServers(await call("/servers"));

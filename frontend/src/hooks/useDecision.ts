@@ -12,6 +12,7 @@ export function useDecision() {
   const [returned, setReturned] = useState<string[]>([]);
   const [trace, setTrace] = useState<TraceLine[]>([]);
   const [error, setError] = useState("");
+  const [step, setStep] = useState(""); // the agent's latest step, live while it works
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const token = useRef(0);
   const last = useRef<DecisionResult | null>(null);
@@ -36,9 +37,12 @@ export function useDecision() {
       setActive([]);
       setReturned([]);
       setTrace([]);
+      setStep("");
       setPrevious(verdict);
       try {
-        const result = await api.decide(question, servers);
+        const result = await api.decide(question, servers, (s) => {
+          if (token.current === id) setStep(s);
+        });
         if (token.current !== id) return;
         last.current = result;
         const next = presentVerdict(result);
@@ -115,6 +119,8 @@ export function useDecision() {
     token.current++;
     finishRef.current = null;
     last.current = null;
+    api.newConversation();
+    setStep("");
     setVerdict(null);
     setPrevious(null);
     setPending(null);
@@ -133,6 +139,7 @@ export function useDecision() {
     returned,
     trace,
     error,
+    step,
     run,
     reset,
     skip: () => finishRef.current?.(),
