@@ -101,3 +101,25 @@ def test_sample_statements_load_by_name(client):
         assert client.get("/statement").json()["balance"] == 94861
     finally:
         client.post("/statement", json={"sample": "manu_statement"})  # the other API tests expect Manu's statement
+
+
+def test_ask_keeps_a_conversation(client):
+    import store
+
+    first = client.post("/ask", json=Q).json()
+    sid = first["session_id"]
+    client.post("/ask", json={"question": "And the weekend after?", "session_id": sid})
+    turns = store.history(sid)
+    assert [t["question"] for t in turns] == [Q["question"], "And the weekend after?"]
+    assert turns[0]["answer"] == {"verdict": first["verdict"]["verdict"], "headline": first["verdict"]["headline"], "intent": first["intent"]}
+    assert client.post("/ask", json={**Q, "session_id": "../../etc/passwd"}).status_code == 422
+
+
+def test_agent_streams_events_without_a_model(client):
+    """No Gemini: the goal is checked as one plan through Orbit's own tool, streamed as server-sent events."""
+    body = client.post("/agent", json={"goal": Q["question"]}).text
+    events = [json.loads(line[6:]) for line in body.splitlines() if line.startswith("data: ")]
+    assert [e["type"] for e in events] == ["session", "tool", "message", "done"]
+    tool = events[1]
+    assert (tool["server"], tool["tool"], tool["by"], tool["ok"]) == ("orbit", "check_plan", "rules", True)
+    assert events[2]["text"] == tool["result"]["verdict"]["headline"]

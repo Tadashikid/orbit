@@ -2,7 +2,8 @@
 
     .venv\\Scripts\\python backend\\main.py
 
-POST /ask {"question": "..."}          -> {"verdict", "explanation", "trace", "planner", "model", "offline"}
+POST /ask {"question", "session_id"?}  -> {"verdict", "explanation", "trace", "planner", "model", "offline", "session_id"}
+POST /agent {"goal", "session_id"?}    -> server-sent events: session, tool, step, message, done (the agent loop)
 GET  /servers                          -> every server: plugged in or not, reachable, and its discovered tools
 POST /servers/{name}/plug | /unplug    -> the hot-plug (the UI's On / Off)
 POST /statement {"csv": "..."}         -> upload a bank statement: masked here, in memory, then handed to Finance
@@ -17,12 +18,14 @@ Gemini explains. The verdict numbers only ever come from the engine.
 import asyncio
 import json
 import os
+import time
 from collections import defaultdict
 from datetime import date
 from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
@@ -32,6 +35,7 @@ import engine  # noqa: E402
 import guardian  # noqa: E402
 import planner  # noqa: E402
 import statement_import  # noqa: E402
+import store  # noqa: E402
 from registry import SERVERS, Registry  # noqa: E402
 
 SAMPLES = Path(__file__).resolve().parents[1] / "data" / "samples"
@@ -42,8 +46,17 @@ app = FastAPI(title="Orbit")
 registry = Registry(plugged=("calendar", "gmail", "travel", "price"))  # ponytail: one shared registry = one user (demo)
 
 
+SESSION_ID = r"^[0-9a-f]{32}$"
+
+
 class Question(BaseModel):
     question: str = Field(min_length=3, max_length=300)
+    session_id: str | None = Field(None, pattern=SESSION_ID)  # continue a conversation; omit to start one
+
+
+class Goal(BaseModel):
+    goal: str = Field(min_length=3, max_length=500)
+    session_id: str | None = Field(None, pattern=SESSION_ID)
 
 
 class Statement(BaseModel):
@@ -144,12 +157,91 @@ def _key(name, args):
     return f"{name} {json.dumps(args, sort_keys=True)}"
 
 
+def _remember(out):
+    """What a session keeps of an answer: the conclusion, never the raw tool results."""
+    return {"verdict": out["verdict"]["verdict"], "headline": out["verdict"]["headline"], "intent": out["intent"]}
+
+
 @app.post("/ask")
 async def ask(body: Question):
+    session = body.session_id or store.new_session()
+    out = await run_question(body.question, store.history(session))
+    store.add_turn(session, body.question, _remember(out))
+    return out | {"session_id": session}
+
+
+@app.post("/agent")
+async def agent_goal(body: Goal):
+    """Server-sent events: session, tool (one per call, with Guardian's decision), message, done."""
+    session = body.session_id or store.new_session()
+
+    async def events():
+        yield _sse({"type": "session", "id": session})
+        final = None
+        async for ev in _agent_events(body.goal, store.history(session)):
+            final = ev["text"] if ev["type"] == "message" else final
+            yield _sse(ev)
+        store.add_turn(session, body.goal, {"headline": final})
+        yield _sse({"type": "done"})
+
+    return StreamingResponse(events(), media_type="text/event-stream")
+
+
+def _sse(event):
+    return f"data: {json.dumps(event)}\n\n"
+
+
+async def _agent_events(goal, history):
+    tools = (await registry.discover())["tools"] + [agent.PLAN_TOOL]
+    guard = guardian.Guard(tools, goal)
+    trace = []
+
+    async def call(name, args):
+        if name == agent.PLAN_TOOL["name"]:  # Orbit's own pipeline, in process: same engine, own Guardian per question
+            start = time.perf_counter()
+            r = {"server": "orbit", "tool": "check_plan", "args": args, "ts": agent._now()}
+            try:
+                out = await run_question(args.get("question", ""), history, explain=False)
+                r.update(ok=True, result={"verdict": out["verdict"], "intent": out["intent"]})
+            except Exception as e:
+                r.update(ok=False, error=f"{type(e).__name__}: {e}"[:200])
+            r["ms"] = round((time.perf_counter() - start) * 1000)
+        else:
+            r = await registry.call(name, args)
+        guard.saw(r)
+        return r
+
+    started = False
+    if GEMINI:
+        try:
+            async for ev in agent.run(goal, history, tools, call, guard.check, GEMINI, agent.models()):
+                started = True
+                trace += [ev] if ev["type"] == "tool" else []
+                yield ev
+        except Exception as e:
+            if started:
+                yield {"type": "message", "text": "The model stopped answering partway through. Try again.", "model": None}
+            else:
+                yield {"type": "step", "text": f"Model unavailable ({str(e)[:120]}): checking it as one plan."}
+    if not started:  # no model: the goal is checked as a single plan by the rules planner
+        decision, why = guard.check(agent.PLAN_TOOL["name"], {"question": goal})
+        if decision != "allowed":
+            yield {"type": "message", "text": f"Blocked by Orbit Guardian: {why}", "model": None}
+        else:
+            r = await call(agent.PLAN_TOOL["name"], {"question": goal})
+            row = agent.entry(r, "rules") | ({"result": r["result"]} if r["ok"] else {})
+            trace.append(row)
+            yield {"type": "tool", **row}
+            yield {"type": "message", "text": r["result"]["verdict"]["headline"] if r["ok"] else r["error"], "model": None}
+    guardian.audit(goal, trace)
+
+
+async def run_question(question, history=(), explain=True):
+    """One question through the whole pipeline: understand, read (Guardian on every call), engine, explain."""
     catalogue = await registry.discover()
     tools = catalogue["tools"]
 
-    guard = guardian.Guard(tools, body.question)
+    guard = guardian.Guard(tools, question)
     check = guard.check
 
     async def call(name, args):
@@ -161,11 +253,11 @@ async def ask(body: Question):
     chain, model, intent, planner_used = agent.models(), None, None, "rules"
     if GEMINI:
         try:
-            model, raw = await agent.understand(body.question, TODAY, GEMINI, chain)
+            model, raw = await agent.understand(question, TODAY, GEMINI, chain, history)
             chain, intent, planner_used = [model], planner.validate(raw, TODAY), "gemini"
         except Exception as e:
             planner_used = f"rules (Gemini unavailable: {str(e)[:120]})"
-    intent = intent or planner.parse(body.question, TODAY)
+    intent = intent or planner.parse(question, TODAY)
     canonical = planner.plan(intent, tools, TODAY)
     needed = {_key(n, a) for n, a in canonical}
     other = intent["kind"] == "other"
@@ -178,7 +270,7 @@ async def ask(body: Question):
     if model and tools:  # no point asking a model to plan with zero tools
         try:
             _, executed, trace, answer = await agent.gather(
-                body.question, planner.facts(intent, TODAY), tools, call, check, GEMINI, chain, enough,
+                question, planner.facts(intent, TODAY), tools, call, check, GEMINI, chain, enough,
                 system=agent.ANSWER if other else agent.SYSTEM)
         except Exception as e:
             planner_used = f"rules (Gemini unavailable: {str(e)[:120]})"
@@ -195,17 +287,17 @@ async def ask(body: Question):
                 for n, why in catalogue["offline"].items()]
 
     # 3. Decide (deterministic engine), 4. explain (model, words only).
-    verdict = engine.decide(body.question, intent, results, list(SERVERS))
+    verdict = engine.decide(question, intent, results, list(SERVERS))
     explanation = None
     if other:
         verdict["headline"] = answer or ('I can answer trips, purchases, outings and savings goals. '
                                          'Try: "Can I buy a laptop this month?"')
-    elif model:
+    elif model and explain:
         try:
             explanation = await agent.explain(verdict, GEMINI, model)
         except Exception:
             pass  # the verdict stands on its own; the explanation is a nice-to-have
-    guardian.audit(body.question, trace)
+    guardian.audit(question, trace)
     shown = {k: v.isoformat() if isinstance(v, date) else v for k, v in intent.items()}
     return {"verdict": verdict, "explanation": explanation, "trace": trace, "planner": planner_used,
             "model": model, "intent": shown, "offline": catalogue["offline"]}
