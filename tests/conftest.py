@@ -15,6 +15,7 @@ os.environ.setdefault("ORBIT_PORT_OFFSET", "100")
 _TMP = tempfile.mkdtemp()  # audit log + sessions db: never data/session/
 os.environ.setdefault("ORBIT_AUDIT_LOG", os.path.join(_TMP, "audit.jsonl"))
 os.environ.setdefault("ORBIT_DB", os.path.join(_TMP, "orbit.db"))
+os.environ.setdefault("FIREBASE_SERVICE_ACCOUNT", "")  # never your real Firestore (set it to run test_store_firestore.py)
 os.environ.setdefault("ORBIT_DEMO_PASSWORD", secrets.token_urlsafe(16))  # a fresh demo login per run, for TestClient
 ROOT = Path(__file__).resolve().parents[1]
 PORTS = tuple(p + int(os.environ["ORBIT_PORT_OFFSET"]) for p in (8101, 8102, 8103, 8104, 8105, 8106))
