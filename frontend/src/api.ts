@@ -51,6 +51,7 @@ export interface OrbitApi {
   // Holds the agent prepared: you confirm (sending back the version you saw) or let them go.
   approve(action: Approval): Promise<Approval>;
   decline(action: Approval): Promise<Approval>;
+  actions(): Promise<Approval[]>; // every booking, newest first (the Bookings window)
   servers(): Promise<{ servers: Server[]; today: string }>;
   setSource(id: string, on: boolean): Promise<{ servers: Server[]; today: string }>;
   statement(): Promise<StatementInfo | null>;
@@ -266,6 +267,9 @@ export const api: OrbitApi = {
   },
   async decline(action) {
     return call<Approval>(`/actions/${action.id}/decline`, {});
+  },
+  async actions() {
+    return (await call<{ actions: Approval[] }>("/actions")).actions;
   },
   newConversation() {
     session = null;

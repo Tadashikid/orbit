@@ -80,6 +80,7 @@ export function fakeBackend({ finance = false, statement = false, signedIn = tru
     }
     if (method === "POST" && path === "/ask") return answer(body.question);
     if (method === "POST" && path === "/agent") return agent(body.goal);
+    if (method === "GET" && path === "/actions") return json({ actions: [] }); // fixtures hold nothing
     // The demo login. Tests start signed in; signedIn: false checks the sign-in screen.
     if (method === "GET" && path === "/me")
       return state.signedIn ? json({ email: DEMO_EMAIL }) : json({ detail: "Sign in first" }, 401);

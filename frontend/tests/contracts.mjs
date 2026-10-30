@@ -120,6 +120,8 @@ try {
   assert.equal(steps.at(-1), `Held: ${card.summary}`);
   assert.equal((await api.approve(card)).status, "confirmed");
   assert.deepEqual(posted.at(-1), [`/api/actions/${card.id}/approve`, { hash: card.hash }]);
+  globalThis.fetch = async (url) => new Response(JSON.stringify({ actions: [card] }), { status: String(url) === "/api/actions" ? 200 : 404 });
+  assert.deepEqual(await api.actions(), [card]); // the Bookings window's list
   // Never shows a malformed answer, never pretends when the backend is down.
   assert.throws(() => toResult({ verdict: { verdict: "maybe" } }, on), ApiError);
   globalThis.fetch = async () => {

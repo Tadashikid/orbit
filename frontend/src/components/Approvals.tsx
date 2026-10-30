@@ -6,7 +6,15 @@ import { Button, money } from "./ui";
 const KIND = { flight: Plane, stay: BedDouble, order: ShoppingCart };
 const time = (iso: string) => new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
 // Holds the agent prepared. Nothing is booked or paid until you press Approve; the AI can't press it for you.
-export default function Approvals({ items, onChange }: { items: Approval[]; onChange: (a: Approval) => void }) {
+export default function Approvals({
+  items,
+  onChange,
+  inWindow = false, // inside the Bookings window, whose title is the heading
+}: {
+  items: Approval[];
+  onChange: (a: Approval) => void;
+  inWindow?: boolean;
+}) {
   const [busy, setBusy] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   if (!items.length) return null;
@@ -22,8 +30,8 @@ export default function Approvals({ items, onChange }: { items: Approval[]; onCh
     }
   };
   return (
-    <section className="approvals" aria-label="Waiting for your approval">
-      <h2>Waiting for your OK</h2>
+    <section className={inWindow ? "approvals approvals-window" : "approvals"} aria-label="Your bookings">
+      {!inWindow && <h2>Waiting for your OK</h2>}
       <p className="approvals-note">
         <ShieldCheck size={16} />
         Orbit put these on hold. Nothing is booked or paid until you approve. Sandbox: no real bookings yet.

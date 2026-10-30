@@ -5,6 +5,7 @@ import {
   Info,
   LogOut,
   SlidersHorizontal,
+  Ticket,
   Wallet,
   ShieldCheck,
   Check,
@@ -25,7 +26,7 @@ import { ConnectDialog, SetupDialog } from "./screens/Dialogs";
 import { Skeleton, Button, Chip, Modal, AnimatedAmount } from "./components/ui";
 import { api } from "./api";
 import { useDecision } from "./hooks/useDecision";
-import type { Server, StatementInfo } from "./types";
+import type { Approval, Server, StatementInfo } from "./types";
 export const HERO = "Can I afford a Goa trip next weekend?";
 const prompts = [
   { q: HERO, label: "A Goa weekend" },
@@ -157,6 +158,27 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
   const closeSetup = useCallback(() => setSetup(false), []);
   const closeConnect = useCallback(() => setConnect(false), []);
   const closeDemo = useCallback(() => setDemo(false), []);
+  // The Bookings window: everything the agent put on hold, ready for your OK, plus what you confirmed or let go.
+  const [bookings, setBookings] = useState<Approval[]>([]);
+  const [bookingsOpen, setBookingsOpen] = useState(false);
+  const refreshBookings = useCallback(() => {
+    api.actions().then(setBookings, () => undefined); // the badge is a nice-to-have; the window shows errors itself
+  }, []);
+  useEffect(() => {
+    if (d.phase === "done" || d.phase === "idle") refreshBookings();
+  }, [d.phase, refreshBookings]);
+  const closeBookings = useCallback(() => setBookingsOpen(false), []);
+  const openBookings = () => {
+    refreshBookings();
+    setBookingsOpen(true);
+  };
+  const bookingChanged = (a: Approval) => {
+    setBookings((all) => all.map((x) => (x.id === a.id ? a : x)));
+    d.updateApproval(a);
+  };
+  const waiting = bookings.filter((b) => b.status === "pending").length;
+  const ORDER = ["pending", "confirmed", "approving", "declined", "expired", "failed"];
+  const sortedBookings = [...bookings].sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status));
   const ask = (q = question, quick = false) => {
     if (busy) return;
     const text = q.trim();
@@ -250,6 +272,15 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
           >
             <Wallet size={18} />
             <span>{statement ? <AnimatedAmount value={statement.balance} /> : "Add balance"}</span>
+          </button>
+          <button
+            className="header-budget"
+            aria-label={`Your bookings${waiting ? `, ${waiting} waiting for your OK` : ""}`}
+            onClick={openBookings}
+          >
+            <Ticket size={18} />
+            <span>Bookings</span>
+            {waiting > 0 && <span className="booking-badge">{waiting}</span>}
           </button>
           <button
             className="discreet-button"
@@ -385,7 +416,7 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
               <button onClick={d.skip}>Show the answer now</button>
             </div>
           )}
-          {d.phase === "done" && <Approvals items={d.approvals} onChange={d.updateApproval} />}
+          {d.phase === "done" && <Approvals items={d.approvals} onChange={bookingChanged} />}
           {d.phase === "done" && !justConnected && (
             <button className="see-plan-button" onClick={scrollToPlan}>
               Your plan is ready. Scroll to explore.
@@ -556,6 +587,18 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
             void loadStatement(true);
           }}
         />
+      )}
+      {bookingsOpen && (
+        <Modal title="READY WHEN YOU ARE." label="your_bookings" onClose={closeBookings}>
+          {sortedBookings.length ? (
+            <Approvals items={sortedBookings} onChange={bookingChanged} inWindow />
+          ) : (
+            <p className="approvals-empty">
+              Nothing on hold yet. Ask Orbit to book something, like “Book a Goa trip next weekend”, and it will show
+              up here for your OK.
+            </p>
+          )}
+        </Modal>
       )}
       {demo && (
         <Modal
