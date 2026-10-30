@@ -143,7 +143,7 @@ def google_sign_in(body: GoogleSignIn, response: Response):
         raise HTTPException(401, "That Google sign-in didn't check out. Try again.") from None
     email = str(claims.get("email") or "").strip().lower()
     if not email or not claims.get("email_verified"):
-        raise HTTPException(401, "Google didn't confirm this email address.")
+        raise HTTPException(401, "Verify your email first: click the link in the email we sent you, then sign in.")
     if "*" not in ALLOWED and email not in ALLOWED:
         raise HTTPException(403, f"{email} isn't on Orbit's list yet. Ask the owner to add it to ORBIT_ALLOWED_EMAILS.")
     response.set_cookie(COOKIE, _signed(email), httponly=True, samesite="strict")  # a session cookie, as above

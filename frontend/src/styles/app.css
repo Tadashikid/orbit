@@ -2522,6 +2522,26 @@
   margin: 0;
   color: var(--on-paper-secondary);
 }
+.signin-or {
+  margin: 0;
+  text-align: center;
+  font-size: 14px;
+  color: var(--on-paper-secondary);
+}
+.signin-switch {
+  margin: 0;
+  text-align: center;
+}
+.signin-switch button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  color: var(--forest-800);
+  text-decoration: underline;
+  cursor: pointer;
+}
 .signin-trust {
   display: flex;
   gap: 8px;
@@ -2625,16 +2645,20 @@
 }
 /* Decline: outlined on paper, dark text (the shared .button is dark green with light text) */
 .approval-actions .approval-decline,
-.approval-actions .approval-decline:hover:not(:disabled) {
+.approval-actions .approval-decline:hover:not(:disabled),
+.button.button-outline,
+.button.button-outline:hover:not(:disabled) {
   --surface-primary: var(--on-paper-primary);
   background: var(--paper);
   color: var(--on-paper-primary);
   border: 1px solid var(--forest-800);
 }
-.approval-actions .approval-decline:before {
+.approval-actions .approval-decline:before,
+.button.button-outline:before {
   background: var(--mint-100);
 }
-.approval-actions .approval-decline .button-label {
+.approval-actions .approval-decline .button-label,
+.button.button-outline .button-label {
   color: var(--on-paper-primary);
 }
 /* The Bookings window (App.tsx) and the header count */

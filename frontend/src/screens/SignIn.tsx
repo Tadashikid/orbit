@@ -3,12 +3,15 @@ import { Eye, ShieldCheck } from "lucide-react";
 import App from "../App";
 import { api } from "../api";
 import { Button } from "../components/ui";
-import { googleConfigured, googleError, googleIdToken } from "../firebase";
-// Sign-in in front of the app: Google (Firebase) first, the demo password only if it's switched on.
-// The backend keeps the session in an httpOnly cookie; this page only asks /me and /auth/config.
+import { authError, emailIdToken, emailSignUp, googleConfigured, googleIdToken } from "../firebase";
+// In front of the app: Sign in (email + password) and Sign up (Google, or email + password). Accounts live in
+// Firebase Auth; the backend checks each token with Google and keeps the session in an httpOnly cookie.
+// The demo password (.env) still signs in from the same form, for offline demos.
+type Screen = "in" | "up" | "sent";
 export default function SignIn() {
   const [user, setUser] = useState<string | null | undefined>(undefined); // undefined = still checking
   const [ways, setWays] = useState({ google: false, demo: false });
+  const [screen, setScreen] = useState<Screen>("in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -20,34 +23,79 @@ export default function SignIn() {
     });
     api.authConfig().then(setWays, () => undefined);
   }, []);
-  const signedIn = async (attempt: () => Promise<string>) => {
+  const accounts = ways.google && googleConfigured(); // Firebase on: Google and email + password accounts
+  const go = (next: Screen) => {
+    setScreen(next);
+    setError("");
+    setPassword("");
+  };
+  const run = async (attempt: () => Promise<void>) => {
     setBusy(true);
     setError("");
     try {
-      setUser(await attempt());
-      setPassword("");
+      await attempt();
     } catch (err) {
-      const message = googleError(err);
+      const message = authError(err);
       if (message) setError(message);
     } finally {
       setBusy(false);
     }
   };
-  const submit = (e: FormEvent) => {
+  const signIn = (e: FormEvent) => {
     e.preventDefault();
-    void signedIn(() => api.login(email, password));
+    void run(async () => {
+      try {
+        if (!accounts) throw Object.assign(new Error(), { code: "auth/invalid-credential" });
+        setUser(await api.googleLogin(await emailIdToken(email, password)));
+      } catch (err) {
+        // Not a Firebase account: maybe the demo login from .env.
+        if (!ways.demo || (err as { code?: string }).code !== "auth/invalid-credential") throw err;
+        setUser(await api.login(email, password).catch(() => Promise.reject({ code: "auth/invalid-credential" })));
+      }
+      setPassword("");
+    });
   };
-  const withGoogle = () => void signedIn(async () => api.googleLogin(await googleIdToken()));
+  const signUp = (e: FormEvent) => {
+    e.preventDefault();
+    void run(async () => {
+      await emailSignUp(email, password);
+      go("sent");
+    });
+  };
+  const withGoogle = () => void run(async () => setUser(await api.googleLogin(await googleIdToken())));
   const signOut = async () => {
     await api.logout().catch(() => undefined); // signed out locally either way
     setUser(null);
   };
   if (user === undefined) return null;
   if (user) return <App onSignOut={signOut} />;
-  const google = ways.google && googleConfigured();
+  const google = accounts && (
+    <Button type="button" tone="forest" className={screen === "up" ? "" : "button-outline"} disabled={busy} onClick={withGoogle}>
+      Continue with Google
+    </Button>
+  );
+  const fields = (
+    <>
+      <label>
+        Email
+        <input type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} />
+      </label>
+      <label>
+        Password
+        <input
+          type="password"
+          autoComplete={screen === "up" ? "new-password" : "current-password"}
+          required
+          minLength={screen === "up" ? 8 : undefined}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+      </label>
+    </>
+  );
   return (
     <main className="signin">
-      <form className="signin-card" onSubmit={submit}>
+      <form className="signin-card" onSubmit={screen === "up" ? signUp : signIn}>
         <span className="brand">
           <span className="logo-mark">
             <Eye size={25} />
@@ -56,39 +104,66 @@ export default function SignIn() {
             ORBIT<span className="brand-period">.</span>
           </span>
         </span>
-        <h1>Sign in</h1>
-        {google && (
+        {screen === "sent" ? (
           <>
-            <p className="signin-note">Use your Google account. Orbit only sees your name and email.</p>
-            <Button type="button" tone="forest" disabled={busy} onClick={withGoogle}>
-              {busy ? "Signing in…" : "Continue with Google"}
+            <h1>Check your inbox</h1>
+            <p className="signin-note">
+              We sent a link to <strong>{email}</strong>. Click it to verify your email, then sign in.
+            </p>
+            <Button type="button" tone="forest" onClick={() => go("in")}>
+              Back to sign in
             </Button>
           </>
-        )}
-        {ways.demo && (
+        ) : screen === "up" ? (
           <>
-            <p className="signin-note">{google ? "Or use the demo account." : "Demo account. Everything stays on this computer."}</p>
-            <label>
-              Email
-              <input type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} />
-            </label>
-            <label>
-              Password
-              <input
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </label>
-            <Button type="submit" tone={google ? "paper" : "forest"} disabled={busy}>
-              {busy ? "Signing in…" : "Sign in"}
-            </Button>
+            <h1>Sign up</h1>
+            {google}
+            {accounts ? (
+              <>
+                <p className="signin-or">or with email</p>
+                {fields}
+                <Button type="submit" tone="forest" className="button-outline" disabled={busy}>
+                  {busy ? "Creating…" : "Create account"}
+                </Button>
+              </>
+            ) : (
+              <p className="signin-note">Sign-up isn't set up yet: add the Firebase settings to .env.</p>
+            )}
+            <p className="signin-switch">
+              Already have an account?{" "}
+              <button type="button" onClick={() => go("in")}>
+                Sign in
+              </button>
+            </p>
           </>
-        )}
-        {!google && !ways.demo && (
-          <p className="signin-note">Sign-in isn't set up yet: add FIREBASE_PROJECT_ID (or a demo password) to .env.</p>
+        ) : (
+          <>
+            <h1>Sign in</h1>
+            {accounts || ways.demo ? (
+              <>
+                {fields}
+                <Button type="submit" tone="forest" disabled={busy}>
+                  {busy ? "Signing in…" : "Sign in"}
+                </Button>
+                {google && (
+                  <>
+                    <p className="signin-or">or</p>
+                    {google}
+                  </>
+                )}
+              </>
+            ) : (
+              <p className="signin-note">Sign-in isn't set up yet: add FIREBASE_PROJECT_ID (or a demo password) to .env.</p>
+            )}
+            {accounts && (
+              <p className="signin-switch">
+                Don't have an account?{" "}
+                <button type="button" onClick={() => go("up")}>
+                  Sign up
+                </button>
+              </p>
+            )}
+          </>
         )}
         {error && (
           <p className="signin-error" role="alert">
