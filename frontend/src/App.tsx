@@ -244,6 +244,10 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
   // Small talk, the weather, "what did I spend": a short reply under the question, not a plan to scroll through.
   const chat = (d.pending || d.verdict)?.verdict === "info";
   const hasPlan = Boolean(d.verdict || d.pending || busy || d.error) && !chat;
+  // A plan the engine cleared with your money checked (the same rule Guardian uses for holds) can be put on hold.
+  const canHold = d.phase === "done" && !chat && !d.approvals.length && Boolean(d.verdict) &&
+    ["yes", "yes_with_conditions", "risky"].includes(d.verdict!.verdict) && d.verdict!.numbers.balance != null &&
+    Boolean(d.verdict!.numbers.breakdown?.length);
   const flagged = d.verdict?.evidence.find((e) => INJECTED.test(e.finding));
   const scrollToPlan = () =>
     document.getElementById("plan")?.scrollIntoView({
@@ -417,6 +421,14 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
                     : "Bringing your plan together…"}
               </span>
               <button onClick={d.skip}>Show the answer now</button>
+            </div>
+          )}
+          {canHold && (
+            <div className="hold-offer">
+              <Button tone="forest" onClick={() => ask(`Book this plan: ${asked}`)}>
+                Hold these for my OK
+              </Button>
+              <span>Free and reversible. Nothing is booked until you approve it.</span>
             </div>
           )}
           {d.phase === "done" && <Approvals items={d.approvals} onChange={bookingChanged} />}

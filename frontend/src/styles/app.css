@@ -2675,3 +2675,14 @@
   font-size: 15px;
   color: var(--on-paper-secondary);
 }
+/* "Hold these for my OK" after a plan that fits (App.tsx) */
+.hold-offer {
+  width: min(760px, 100%);
+  margin: 20px auto 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  align-items: center;
+  justify-content: center;
+  color: var(--on-paper-secondary);
+}
