@@ -29,6 +29,8 @@ export function googleError(e: unknown): string | null {
   const code = (e as { code?: string })?.code ?? "";
   if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") return null;
   if (code === "auth/popup-blocked") return "Your browser blocked the Google sign-in window. Allow pop-ups for this site.";
-  if (code === "auth/unauthorized-domain") return "This address isn't in Firebase's authorized domains.";
+  if (code === "auth/unauthorized-domain")
+    return `Firebase doesn't allow sign-in from ${location.hostname} yet. Add it under Authentication › Settings › ` +
+      `Authorized domains${location.hostname === "127.0.0.1" ? ", or open localhost instead" : ""}.`;
   return (e as Error)?.message || "Google sign-in didn't work. Try again.";
 }
