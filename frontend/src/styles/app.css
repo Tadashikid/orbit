@@ -2646,14 +2646,6 @@
   font-weight: 600;
   font-size: 14px;
 }
-.phone-alerts-title {
-  display: flex;
-  flex: 1 1 220px;
-  gap: 6px;
-  align-items: center;
-  font-weight: 600;
-  font-size: 14px;
-}
 .phone-alerts label > span {
   display: flex;
   gap: 6px;

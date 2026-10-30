@@ -99,7 +99,6 @@ export function fakeBackend({ finance = false, statement = false, signedIn = tru
       return json({ email: DEMO_EMAIL, name: "Manu" });
     }
     if (method === "GET" && path === "/me/phone") return json({ phone: null, alerts: null });
-    if (method === "GET" && path === "/me/telegram") return json({ ready: false, chats: 0 });
     if (method === "POST" && path === "/me/delete") {
       state.signedIn = false;
       return json({ deleted: true });

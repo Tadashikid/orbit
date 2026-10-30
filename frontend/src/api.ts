@@ -64,10 +64,6 @@ export interface OrbitApi {
   deleteMe(): Promise<void>;
   // Your number for WhatsApp / SMS booking alerts; alerts = the channel, or null when Twilio isn't set up
   phone(): Promise<PhoneAlerts>;
-  // Telegram alerts: linked chats, and a one-time t.me link (shown as a QR) that links whoever taps Start
-  telegram(): Promise<{ ready: boolean; chats: number }>;
-  telegramLink(): Promise<{ link: string }>;
-  telegramUnlink(): Promise<{ ready: boolean; chats: number }>;
   setPhone(phone: string): Promise<PhoneAlerts>; // Delete my data: everything Orbit keeps for you, and your account; signs you out
   // Your own Google Calendar + Gmail, read-only: connecting is a page visit to /api/google/connect (Google's screen).
   googleStatus(): Promise<GoogleStatus>;
@@ -318,15 +314,6 @@ export const api: OrbitApi = {
   async logout() {
     session = null;
     await call("/logout", {});
-  },
-  async telegram() {
-    return call<{ ready: boolean; chats: number }>("/me/telegram");
-  },
-  async telegramLink() {
-    return call<{ link: string }>("/me/telegram/link", {});
-  },
-  async telegramUnlink() {
-    return call<{ ready: boolean; chats: number }>("/me/telegram/unlink", {});
   },
   async phone() {
     return call<PhoneAlerts>("/me/phone");
