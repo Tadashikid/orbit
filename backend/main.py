@@ -149,8 +149,13 @@ async def ask(body: Question):
     catalogue = await registry.discover()
     tools = catalogue["tools"]
 
-    def check(name):
-        return guardian.check(name, tools)
+    guard = guardian.Guard(tools, body.question)
+    check = guard.check
+
+    async def call(name, args):
+        r = await registry.call(name, args)
+        guard.saw(r)  # private values read here can't leave in a later outbound call
+        return r
 
     # 1. Understand: Gemini turns the question into an intent; code validates it. Rules parser if no model answers.
     chain, model, intent, planner_used = agent.models(), None, None, "rules"
@@ -173,15 +178,15 @@ async def ask(body: Question):
     if model and tools:  # no point asking a model to plan with zero tools
         try:
             _, executed, trace, answer = await agent.gather(
-                body.question, planner.facts(intent, TODAY), tools, registry.call, check, GEMINI, chain, enough,
+                body.question, planner.facts(intent, TODAY), tools, call, check, GEMINI, chain, enough,
                 system=agent.ANSWER if other else agent.SYSTEM)
         except Exception as e:
             planner_used = f"rules (Gemini unavailable: {str(e)[:120]})"
 
     # The numbers only use the canonical reads; whatever the model skipped or asked for differently is filled in here.
     done = {_key(f"{r['server']}__{r['tool']}", r["args"]): r for r in executed if r["ok"]}
-    missing = [(n, a) for n, a in canonical if _key(n, a) not in done and check(n)[0] == "allowed"]
-    topped_up = await asyncio.gather(*(registry.call(n, a) for n, a in missing))
+    missing = [(n, a) for n, a in canonical if _key(n, a) not in done and check(n, a)[0] == "allowed"]
+    topped_up = await asyncio.gather(*(call(n, a) for n, a in missing))
     trace += [agent.entry(r, "rules") for r in topped_up]
     done |= {_key(n, a): r for (n, a), r in zip(missing, topped_up)}
     results = [done[_key(n, a)] for n, a in canonical if _key(n, a) in done]
@@ -200,6 +205,7 @@ async def ask(body: Question):
             explanation = await agent.explain(verdict, GEMINI, model)
         except Exception:
             pass  # the verdict stands on its own; the explanation is a nice-to-have
+    guardian.audit(body.question, trace)
     shown = {k: v.isoformat() if isinstance(v, date) else v for k, v in intent.items()}
     return {"verdict": verdict, "explanation": explanation, "trace": trace, "planner": planner_used,
             "model": model, "intent": shown, "offline": catalogue["offline"]}

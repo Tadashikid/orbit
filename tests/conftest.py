@@ -2,6 +2,7 @@ import os
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -10,6 +11,7 @@ import pytest
 # Before any test imports registry/main: the tests run their own MCP servers on 8201-8205, so they never read or
 # overwrite the statement uploaded to your running servers (run_servers.py on 8101-8105).
 os.environ.setdefault("ORBIT_PORT_OFFSET", "100")
+os.environ.setdefault("ORBIT_AUDIT_LOG", os.path.join(tempfile.mkdtemp(), "audit.jsonl"))  # never data/session/
 ROOT = Path(__file__).resolve().parents[1]
 PORTS = tuple(p + int(os.environ["ORBIT_PORT_OFFSET"]) for p in (8101, 8102, 8103, 8104, 8105))
 SAMPLE = ROOT / "data" / "samples" / "manu_statement.csv"

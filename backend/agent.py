@@ -146,7 +146,7 @@ async def gather(question, facts, catalogue, call_tool, check, generate, chain, 
             text = (resp.text or "").strip() or None
             break
         contents.append(resp.candidates[0].content)  # keeps Gemini's thought signatures
-        decisions = [(c, *check(c.name)) for c in calls]
+        decisions = [(c, *check(c.name, clean(c.args))) for c in calls]
         allowed = [c for c, decision, _ in decisions if decision == "allowed"]
         ran = await asyncio.gather(*(call_tool(c.name, clean(c.args)) for c in allowed))
         results = dict(zip(map(id, allowed), ran))
