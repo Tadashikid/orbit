@@ -110,6 +110,15 @@ def validate(raw, today):
     return intent
 
 
+PRODUCTISH = re.compile(
+    r"\d|\b(laptop|phone|iphone|ipad|macbook|tv|television|watch|headphones?|earbuds|airpods|speakers?|camera|console|"
+    r"ps5|xbox|tablet|monitor|keyboard|mouse|chair|table|desk|sofa|bed|mattress|bike|cycle|scooter|car|shoes?|"
+    r"sneakers|jacket|bag|fridge|refrigerator|microwave|guitar|apple|samsung|sony|hp|dell|lenovo|asus|acer|oneplus|"
+    r"xiaomi|nike|adidas|ikea|bose|jbl|canon|nikon|lg)\b")
+CHAT = re.compile(r"\b(weather|rain|temperature|news|joke|did i|have i|i spent|how much did|am i free|my schedule|"
+                  r"my calendar|deadlines?)\b")
+
+
 def parse(question, today):
     """Rules fallback for when no model answers: good enough for the common phrasings, then validate()."""
     q = question.lower()
@@ -132,9 +141,14 @@ def parse(question, today):
                      r"worth|affordable|right now|now)\b|[?!,]|\.?$)", q)
     raw["item"] = item.group(1).strip(" .-") if item else None
     bought = re.search(r"\b(buy|afford|purchase|get|order|want|need|spend on|price of|cost of|upgrade to|budget)\b", q)
-    if not raw["item"] and len(q.split()) <= 5 and not re.search(  # a bare product name: "hp omen laptop"
-            r"^(should|can|could|how|what|why|when|where|who|which|is|are|do|does|will|would|i|my)\b", q):
+    # A bare product name ("hp omen laptop", "iphone 16") must look like one: a model number or a product word.
+    # Small talk ("hi", "whats the weather?", "tell me a joke") is never priced.
+    if not raw["item"] and len(q.split()) <= 5 and PRODUCTISH.search(q) and not re.search(
+            r"^(should|can|could|how|what|whats|what's|why|when|where|who|which|is|are|am|do|does|did|will|would|i|my|"
+            r"hi|hello|hey|tell|thanks|thank|ok|okay|yes|no|please)\b", q):
         raw["item"], bought = q.strip(" ?.!") or None, True
+    if CHAT.search(q):  # the weather, past spending, the schedule: answered from data (or declined), never priced
+        bought = None
     if "save" in q:
         raw["kind"] = "savings_goal"
     elif city:

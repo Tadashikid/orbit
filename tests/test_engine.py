@@ -200,6 +200,23 @@ def test_anything_else_becomes_an_info_answer():
     assert (v["kind"], v["verdict"]) == ("other", "info") and calls  # main.py puts the model's answer in the headline
 
 
+@pytest.mark.parametrize("question", [
+    "whats the weather?", "weather tomorrow", "hi", "tell me a joke", "asdfgh",  # small talk and gibberish
+    "am I free on saturday", "what did I spend on food",  # questions about the user's own data, not a purchase
+])
+def test_small_talk_is_never_priced(question):
+    assert planner.parse(question, TODAY)["kind"] == "other"
+
+
+@pytest.mark.parametrize("question, item", [
+    ("iPhone 16", "iphone 16"), ("hp omen laptop", "hp omen laptop"), ("sony wh-1000xm5", "sony wh-1000xm5"),
+    ("Can I buy a table?", "table"), ("buy a ps5", "ps5"),
+])
+def test_bare_product_names_still_count(question, item):
+    intent = planner.parse(question, TODAY)
+    assert (intent["kind"], intent["item"]) == ("purchase", item)
+
+
 def test_rules_parser_knows_any_destination_and_trip_dates():
     japan = planner.parse("can i go to japan tomorrow", TODAY)
     assert (japan["kind"], japan["dest"], japan["abroad"]) == ("trip", "NRT", True)
