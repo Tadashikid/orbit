@@ -3,6 +3,7 @@
 Everything lives under users/{email}/, so an account's data is one path and a read can't reach another's:
   users/{email}/sessions/{session}/turns/{auto}   a conversation, oldest first by `at`
   users/{email}/actions/{id}                      holds waiting for you, newest first by `at`
+  users/{email}/secrets/{name}                    already encrypted by the caller (google_link.py)
 Only this backend touches it (the admin key skips security rules); firestore.rules denies every browser.
 """
 import hashlib
@@ -76,3 +77,16 @@ def move(owner, action_id, frm, to, outcome=None):
         return True
 
     return step(db.transaction())
+
+
+def save_secret(owner, name, value):
+    _user(owner).collection("secrets").document(name).set({"value": value})
+
+
+def secret(owner, name):
+    doc = _user(owner).collection("secrets").document(name).get()
+    return doc.get("value") if doc.exists else None
+
+
+def forget_secret(owner, name):
+    _user(owner).collection("secrets").document(name).delete()

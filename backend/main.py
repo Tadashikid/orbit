@@ -8,6 +8,8 @@ WS   /voice                            -> talk to Orbit: mic audio in, spoken re
 GET  /actions                          -> every booking the agent prepared, newest first (expired holds marked)
 POST /actions/{id}/approve {"hash"}    -> confirm a hold the agent prepared (sandbox: nothing is charged)
 POST /actions/{id}/decline             -> let it go
+GET  /google/connect, /google/callback -> link your own Google Calendar + Gmail (backend/google_link.py)
+GET  /google/status, POST /google/disconnect
 POST /ask {"question", "session_id"?}  -> {"verdict", "explanation", "trace", "planner", "model", "offline", "session_id"}
 POST /agent {"goal", "session_id"?}    -> server-sent events: session, tool, step, message, done (the agent loop)
 GET  /servers                          -> every server: plugged in or not, reachable, and its discovered tools
@@ -31,19 +33,20 @@ import secrets
 import time
 from collections import defaultdict
 from contextlib import suppress
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 import agent  # noqa: E402  (reads GEMINI_* from .env)
 import engine  # noqa: E402
+import google_link  # noqa: E402
 import guardian  # noqa: E402
 import planner  # noqa: E402
 import statement_import  # noqa: E402
@@ -67,7 +70,7 @@ COOKIE = "orbit_session"
 # start, and a new password signs everyone out too.
 BOOT = os.getenv("ORBIT_BOOT") or secrets.token_hex(16)
 _KEY = hashlib.sha256(f"orbit-session:{DEMO_PASSWORD}:{BOOT}".encode()).digest()
-OPEN = {"/login", "/logout", "/me", "/auth/google", "/auth/config"}
+OPEN = {"/login", "/logout", "/me", "/auth/google", "/auth/config", "/google/callback"}  # callback: checks its own cookie
 # Google sign-in (Firebase Auth): the browser signs in with Google, the backend checks Google's signature for this
 # project and sets the same session cookie as the demo login. The project id is public; no secret is needed for this.
 FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID") or ""
@@ -159,6 +162,56 @@ def me(request: Request):
     if not email:
         raise HTTPException(401, "Sign in first")
     return {"email": email}
+
+
+# Link your own Google Calendar + Gmail. The state cookie ties Google's answer to you and this one attempt (no CSRF);
+# it is lax, not strict, because Google's redirect back is a navigation from accounts.google.com.
+GOOGLE_STATE = "orbit_google_state"
+
+
+@app.get("/google/connect")
+def google_connect(request: Request):
+    if not google_link.ready():
+        raise HTTPException(503, "Google isn't set up: add GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and ORBIT_TOKEN_KEY to .env")
+    me, nonce = _user(request), secrets.token_urlsafe(24)
+    r = RedirectResponse(google_link.connect_url(nonce, me), status_code=303)
+    r.set_cookie(GOOGLE_STATE, _signed(f"{nonce}:{me}"), max_age=600, httponly=True, samesite="lax")
+    return r
+
+
+@app.get("/google/callback")
+def google_callback(request: Request, state: str = "", code: str = "", error: str = ""):
+    value = request.cookies.get(GOOGLE_STATE, "")
+    payload = value.rpartition(".")[0]
+    nonce, _, me = payload.partition(":")
+    if not (payload and hmac.compare_digest(value.encode(), _signed(payload).encode())
+            and hmac.compare_digest(nonce.encode(), state.encode())):
+        result = "expired"
+    elif error or not code:
+        result = "cancelled"
+    else:
+        try:
+            google_link.finish(me, code)
+            result = "connected"
+        except Exception as e:
+            print(f"google connect failed: {type(e).__name__}: {str(e)[:200]}")
+            result = "failed"
+    # A page, not a redirect: the session cookie is strict, so the app must load from a same-site navigation.
+    page = HTMLResponse('<!doctype html><meta charset="utf-8"><title>Orbit</title>'
+                        f'<script>location.replace("/?google={result}")</script>')
+    page.delete_cookie(GOOGLE_STATE)
+    return page
+
+
+@app.get("/google/status")
+def google_status(request: Request):
+    return google_link.status(_user(request))
+
+
+@app.post("/google/disconnect")
+def google_disconnect(request: Request):
+    google_link.disconnect(_user(request))
+    return google_link.status(_user(request))
 
 
 SESSION_ID = r"^[0-9a-f]{32}$"
@@ -352,7 +405,7 @@ BOOK = re.compile(r"\b(book|hold|reserve|order|buy it|get it)\b", re.I)
 
 
 async def _agent_events(goal, history, session=None, owner=None):
-    tools = (await registry.discover())["tools"] + [agent.PLAN_TOOL]
+    tools = (await registry.discover())["tools"] + [agent.PLAN_TOOL, agent.DRAFT_EMAIL, agent.DRAFT_EVENT]
     guard = guardian.Guard(tools, goal)
     trace, approvals = [], []
 
@@ -370,6 +423,15 @@ async def _agent_events(goal, history, session=None, owner=None):
             except Exception as e:
                 r.update(ok=False, error=f"{type(e).__name__}: {e}"[:200])
             r["ms"] = round((time.perf_counter() - start) * 1000)
+        elif name in DRAFTS:  # an email or event, as a card you approve: nothing is sent or added here
+            r = {"server": "orbit", "tool": name.partition("__")[2], "args": args, "ts": agent._now(), "ms": 0}
+            try:
+                approvals.append(store.add_action(owner, session, _draft(name, args)))
+                r.update(ok=True, result={"status": "drafted: waiting for the user to tap Approve",
+                                          "google": "connected" if google_link.status(owner)["connected"] else
+                                          "not connected: tell the user to tap Connect Google before approving"})
+            except ValueError as e:
+                r.update(ok=False, error=str(e))
         else:
             r = await registry.call(name, args)
             if r["ok"] and name.startswith("booking__hold_"):
@@ -446,6 +508,41 @@ async def _agent_events(goal, history, session=None, owner=None):
     guardian.audit(goal, trace)
 
 
+IST = timezone(timedelta(hours=5, minutes=30))
+DRAFTS = {agent.DRAFT_EMAIL["name"], agent.DRAFT_EVENT["name"]}
+
+
+def _when(text):
+    """An event time from the model: ISO, India time unless it says otherwise."""
+    try:
+        t = datetime.fromisoformat(str(text))
+    except ValueError:
+        raise ValueError(f"not a date and time: {str(text)[:40]}") from None
+    return t if t.tzinfo else t.replace(tzinfo=IST)
+
+
+def _draft(name, args):
+    """The email or event the agent wrote, as an action: exactly what you'll read on the card and approve."""
+    now = datetime.now(timezone.utc)
+    common = {"hold_id": "", "amount": 0, "currency": "INR", "expires_at": (now + timedelta(days=7)).isoformat()}
+    if name == agent.DRAFT_EMAIL["name"]:
+        to = [a.strip() for a in args.get("to") or [] if isinstance(a, str)]
+        subject, body = str(args.get("subject") or "").strip()[:200], str(args.get("body") or "").strip()[:5000]
+        if not (to and subject and body) or not all(guardian.EMAIL.fullmatch(a) for a in to):
+            raise ValueError("an email needs valid addresses, a subject and a body")
+        return common | {"kind": "email", "summary": f"Email to {', '.join(to)}: {subject}",
+                         "detail": {"to": to, "subject": subject, "body": body}}
+    start, end = _when(args.get("start")), _when(args.get("end"))
+    title = str(args.get("title") or "").strip()[:200]
+    guests = [a.strip() for a in args.get("attendees") or [] if isinstance(a, str)]
+    if not title or end <= start or start < now or not all(guardian.EMAIL.fullmatch(a) for a in guests):
+        raise ValueError("an event needs a title, valid guests, and a future start before its end")
+    return common | {"kind": "event", "summary": f"{title}, {start.astimezone(IST):%a %d %b, %H:%M}",
+                     "expires_at": min(start, now + timedelta(days=7)).isoformat(),
+                     "detail": {"title": title, "start": start.isoformat(), "end": end.isoformat(), "attendees": guests,
+                                "description": str(args.get("description") or "")[:2000]}}
+
+
 MAX_APPROVAL = int(os.getenv("ORBIT_MAX_APPROVAL") or 50_000)  # per action, in rupees; bigger ones you do yourself
 HEX32 = r"^[0-9a-f]{32}$"
 
@@ -480,6 +577,8 @@ async def approve(action_id: str, body: Approval, request: Request):
     # ponytail: the cap is in rupees, so it skips other currencies; only Duffel TEST fares (GBP/USD) use them today.
     if a["currency"] == "INR" and a["amount"] > MAX_APPROVAL:
         raise HTTPException(403, f"Over your approval limit of Rs {MAX_APPROVAL:,}. Book this one yourself.")
+    if a["kind"] in ("email", "event"):
+        return await _send(request, a)
     if not store.move(_user(request), action_id, "pending", "approving"):
         raise HTTPException(409, f"This hold is already {a['status']}")
     r = await registry.call("booking__confirm_hold", {"hold_id": a["hold_id"]})
@@ -493,12 +592,39 @@ async def approve(action_id: str, body: Approval, request: Request):
     return _public(store.get_action(_user(request), action_id))
 
 
+async def _send(request, a):
+    """Your Approve on an email or event card: sent or added with your own Google account, once."""
+    me, d = _user(request), a["detail"]
+    if not google_link.status(me)["connected"]:
+        raise HTTPException(409, "Connect your Google account first (the Google button at the top), then approve.")
+    if not store.move(me, a["id"], "pending", "approving"):
+        raise HTTPException(409, f"This one is already {a['status']}")
+    try:
+        if a["kind"] == "email":
+            out = await asyncio.to_thread(google_link.send_email, me, d["to"], d["subject"], d["body"])
+        else:
+            out = await asyncio.to_thread(google_link.add_event, me, d["title"], d["start"], d["end"], d["description"],
+                                          d["attendees"])
+        error = None
+    except Exception as e:  # Google said no (scope removed, quota...): say so, it stays failed
+        out, error = None, f"{type(e).__name__}: {e}"[:200]
+    tool = "send_email" if a["kind"] == "email" else "add_event"
+    guardian.audit(f"approve: {a['summary']}", [{"server": "google", "tool": tool, "args": {"action": a["id"]}, "by": "you",
+                                                 "guardian": "approved by you", "error": error}])
+    if error:
+        store.move(me, a["id"], "approving", "failed", {"error": error})
+        raise HTTPException(409, f"Couldn't do it: {error[-120:]}")
+    store.move(me, a["id"], "approving", "confirmed", out)
+    return _public(store.get_action(me, a["id"]))
+
+
 @app.post("/actions/{action_id}/decline")
 async def decline(action_id: str, request: Request):
     a = _action_or_404(request, action_id)
     if not store.move(_user(request), action_id, "pending", "declined"):
         raise HTTPException(409, f"This hold is already {a['status']}")
-    await registry.call("booking__release_hold", {"hold_id": a["hold_id"]})  # best effort: holds expire anyway
+    if a["hold_id"]:  # emails and events hold nothing anywhere
+        await registry.call("booking__release_hold", {"hold_id": a["hold_id"]})  # best effort: holds expire anyway
     guardian.audit(f"decline: {a['summary']}", [{"server": "booking", "tool": "release_hold", "args": {"hold_id": a["hold_id"]},
                                                  "by": "you", "guardian": "declined by you", "error": None}])
     return _public(store.get_action(_user(request), action_id))

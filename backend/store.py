@@ -23,6 +23,7 @@ def _db():
     con.execute("CREATE TABLE IF NOT EXISTS turns (session TEXT, ts TEXT, question TEXT, answer TEXT, owner TEXT)")
     con.execute("CREATE TABLE IF NOT EXISTS actions (id TEXT PRIMARY KEY, session TEXT, ts TEXT, hold TEXT, hash TEXT,"
                 " status TEXT, outcome TEXT, owner TEXT)")
+    con.execute("CREATE TABLE IF NOT EXISTS secrets (owner TEXT, name TEXT, value TEXT, PRIMARY KEY (owner, name))")
     for table in ("turns", "actions"):  # a database from before accounts: its rows were the demo account's
         if "owner" not in {c[1] for c in con.execute(f"PRAGMA table_info({table})")}:
             with con:
@@ -92,7 +93,7 @@ def _action(row):
     h = json.loads(hold)
     return {"id": action_id, "session": session, "hold_id": h["hold_id"], "kind": h["kind"], "summary": h["summary"],
             "amount": h["amount"], "currency": h.get("currency", "INR"), "expires_at": h["expires_at"], "hash": digest,
-            "status": status,
+            "status": status, **({"detail": h["detail"]} if "detail" in h else {}),  # an email's text, an event's time
             **({"outcome": json.loads(outcome)} if outcome else {})}
 
 
@@ -105,6 +106,30 @@ def all_actions(owner, limit=50):
     return [_action(r) for r in rows]
 
 
+
+# Secrets, one per (owner, name): already encrypted by the caller (google_link.py), stored as they come.
+def save_secret(owner, name, value):
+    con = _db()
+    with con:
+        con.execute("INSERT OR REPLACE INTO secrets VALUES (?, ?, ?)", (owner, name, value))
+    con.close()
+
+
+def secret(owner, name):
+    con = _db()
+    row = con.execute("SELECT value FROM secrets WHERE owner = ? AND name = ?", (owner, name)).fetchone()
+    con.close()
+    return row[0] if row else None
+
+
+def forget_secret(owner, name):
+    con = _db()
+    with con:
+        con.execute("DELETE FROM secrets WHERE owner = ? AND name = ?", (owner, name))
+    con.close()
+
+
 # FIREBASE_SERVICE_ACCOUNT set: the same functions, kept in Firestore instead (backend/store_firestore.py).
 if os.getenv("FIREBASE_SERVICE_ACCOUNT"):
-    from store_firestore import add_action, add_turn, all_actions, get_action, history, move  # noqa: E402,F401,F811
+    from store_firestore import (add_action, add_turn, all_actions, forget_secret, get_action, history,  # noqa: E402,F401,F811
+                                 move, save_secret, secret)
