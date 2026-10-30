@@ -11,7 +11,9 @@ import pytest
 # Before any test imports registry/main: the tests run their own MCP servers on 8201-8205, so they never read or
 # overwrite the statement uploaded to your running servers (run_servers.py on 8101-8105).
 os.environ.setdefault("ORBIT_PORT_OFFSET", "100")
-os.environ.setdefault("ORBIT_AUDIT_LOG", os.path.join(tempfile.mkdtemp(), "audit.jsonl"))  # never data/session/
+_TMP = tempfile.mkdtemp()  # audit log + sessions db: never data/session/
+os.environ.setdefault("ORBIT_AUDIT_LOG", os.path.join(_TMP, "audit.jsonl"))
+os.environ.setdefault("ORBIT_DB", os.path.join(_TMP, "orbit.db"))
 ROOT = Path(__file__).resolve().parents[1]
 PORTS = tuple(p + int(os.environ["ORBIT_PORT_OFFSET"]) for p in (8101, 8102, 8103, 8104, 8105))
 SAMPLE = ROOT / "data" / "samples" / "manu_statement.csv"
