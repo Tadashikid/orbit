@@ -5,6 +5,8 @@
 credentials.json
 token.json
 client_secret*.json
+firebase-service-account*.json
+*-firebase-adminsdk-*.json
 *.pem
 *.key
 
