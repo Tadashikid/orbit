@@ -1,0 +1,790 @@
+/* Styling and motion only. Existing dimensions, radii and layout remain owned by app/journey. */
+#root {
+  position: relative;
+  isolation: isolate;
+}
+body {
+  background: var(--paper);
+  color: var(--surface-primary);
+}
+.paper,
+.red,
+.amber,
+.orange,
+.muted {
+  color: var(--surface-primary);
+}
+.forest,
+.lime,
+.violet,
+.pill {
+  color: var(--surface-primary);
+}
+.forest,
+.lime {
+  background: var(--forest-800);
+}
+.violet {
+  background: var(--forest-900);
+}
+.pill {
+  background: var(--forest-800);
+}
+.page-atmosphere {
+  position: fixed;
+  inset: -10px;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+.contour-layer {
+  width: 100%;
+  height: 100%;
+  opacity: 0.055;
+  animation: contour-drift 56s linear infinite alternate;
+}
+.background-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(
+    ellipse at 50% 42%,
+    var(--ink) 30%,
+    transparent 85%
+  );
+  transform: translateY(var(--grid-shift, 0px));
+}
+.paper-grain {
+  position: fixed;
+  inset: 0;
+  opacity: 0.035;
+  pointer-events: none;
+  z-index: 100;
+}
+.context-connections {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+.calm-header:after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--forest-800);
+  transform: scaleX(var(--scroll-progress, 0));
+  transform-origin: left;
+  pointer-events: none;
+}
+.calm-header {
+  background: var(--paper);
+}
+.calm-header .logo-mark {
+  background: var(--forest-800);
+  color: var(--surface-primary);
+}
+.landing h1 > .headline-mask {
+  display: block;
+  overflow: hidden;
+  color: var(--surface-primary);
+}
+.headline-line {
+  display: block;
+}
+.headline-mask:last-child .headline-line {
+  color: var(--forest-600);
+}
+.calm-ask,
+.calm-suggestions {
+  position: relative;
+  z-index: 2;
+}
+.calm-ask textarea {
+  color: var(--surface-primary);
+}
+.calm-ask textarea::placeholder {
+  color: var(--forest-600);
+}
+.calm-ask:focus-within {
+  border-color: var(--forest-600);
+}
+.source-dock {
+  background: var(--forest-800);
+  color: var(--surface-primary);
+  border-color: var(--dark-hairline);
+  translate: 0 -50%;
+}
+.dock-heading,
+.dock-icon.enabled {
+  color: var(--surface-primary);
+}
+.dock-icon {
+  color: var(--surface-secondary);
+}
+.dock-icon:hover,
+.dock-icon:focus-visible {
+  background: var(--forest-900);
+  color: var(--surface-primary);
+}
+.dock-tooltip {
+  color: var(--surface-primary);
+  background: var(--forest-900);
+  border-color: var(--dark-hairline);
+  transition:
+    transform 240ms var(--ease),
+    opacity 240ms var(--ease);
+}
+.dock-indicator {
+  background: var(--mint-300);
+}
+.dock-indicator:after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--mint-300);
+  animation: status-breathe 3s ease-in-out infinite;
+}
+.dock-icon.reading:after {
+  content: "";
+  position: absolute;
+  inset: 3px auto 3px 0;
+  width: 5px;
+  background: var(--mint-100);
+  opacity: 0;
+  pointer-events: none;
+  animation: rail-shimmer 600ms var(--ease) both;
+}
+.dock-divider {
+  border-color: var(--dark-hairline);
+}
+.source-readiness,
+.budget-read-summary,
+.budget-added {
+  background: var(--forest-800);
+  color: var(--surface-primary);
+  border-color: var(--dark-hairline);
+}
+.source-readiness :is(span, p, strong),
+.budget-added > span {
+  color: inherit;
+}
+.source-mode button.selected {
+  background: var(--forest-800);
+  color: var(--surface-primary);
+}
+.journey-card {
+  background: var(--forest-800);
+  color: var(--surface-primary);
+  border-color: var(--dark-hairline);
+}
+.journey-card :is(p, span, strong, h3, small, footer) {
+  color: inherit;
+}
+.journey-card .card-step {
+  color: var(--surface-accent);
+}
+.journey-card .flashcard-tab {
+  background: var(--forest-900);
+  color: var(--surface-primary);
+  border-color: var(--dark-hairline);
+}
+.journey-card .flashcard-details {
+  background: var(--forest-900);
+  color: var(--surface-primary);
+  border-color: var(--dark-hairline);
+}
+.journey-card .detail-note,
+.journey-card .flashcard-footer {
+  border-color: var(--dark-hairline);
+}
+.journey-card .route-line {
+  border-color: var(--mint-300);
+}
+.journey-card .route-line > svg {
+  background: var(--forest-900);
+}
+.journey-stay {
+  background: var(--sand-300);
+  color: var(--surface-primary);
+  border-color: var(--hairline);
+}
+.journey-stay .flashcard-tab {
+  background: var(--sand-300);
+  color: var(--surface-primary);
+  border-color: var(--hairline);
+}
+.journey-stay .card-step {
+  color: var(--surface-primary);
+}
+.journey-stay .flashcard-details {
+  background: var(--paper);
+  color: var(--surface-primary);
+  border-color: var(--hairline);
+}
+.journey-stay .detail-note,
+.journey-stay .flashcard-footer {
+  border-color: var(--hairline);
+}
+.trip-summary {
+  background: var(--forest-900);
+  color: var(--surface-primary);
+  border-color: var(--dark-hairline);
+}
+.trip-summary :is(p, span, strong, h2, h3, small) {
+  color: inherit;
+}
+.trip-summary .summary-heading,
+.trip-summary .summary-actions,
+.trip-summary .summary-costs > div {
+  border-color: var(--dark-hairline);
+}
+.summary-decision {
+  position: relative;
+  background: var(--forest-800);
+  color: var(--surface-primary);
+  border-color: var(--dark-hairline);
+}
+.summary-money > span {
+  border-color: var(--dark-hairline);
+}
+.trip-summary .insights-link,
+.trip-summary .balance-freshness button {
+  color: var(--surface-primary);
+  border-color: var(--mint-300);
+}
+.summary-options button[aria-pressed="true"] {
+  background: var(--forest-900);
+  border-color: var(--mint-300);
+}
+.calm-footer {
+  background: var(--forest-900);
+  color: var(--surface-primary);
+  border-color: var(--dark-hairline);
+}
+.calm-footer > button {
+  color: var(--surface-primary);
+  border-color: var(--mint-300);
+}
+.modal {
+  background: var(--paper);
+  color: var(--surface-primary);
+}
+.warning-card,
+.approval-note,
+.insights-injection,
+.error-banner,
+.quiet-notice {
+  background: var(--sand-300);
+  color: var(--surface-primary);
+}
+.empty-chart {
+  color: var(--surface-primary);
+}
+.graph-node.returned,
+.graph-node.verdict.returned,
+.graph-node.new-source,
+.mobile-flow-source.returned,
+.mobile-flow-verdict {
+  background: var(--forest-800);
+  color: var(--surface-primary);
+  border-color: var(--dark-hairline);
+}
+.graph-node.returned .node-provenance {
+  background: var(--forest-900);
+  color: var(--surface-primary);
+  border-color: var(--dark-hairline);
+}
+.graph-node.returned .node-top > svg:last-child {
+  background: var(--mint-300);
+  color: var(--surface-primary);
+}
+.graph-node.highlighted {
+  outline: 1px solid var(--forest-600);
+}
+.graph-node .graph-ripple,
+.mobile-flow-source .graph-ripple,
+.mobile-flow-verdict .graph-ripple {
+  border-color: var(--mint-300);
+}
+.graph-node.question .graph-ripple,
+.mobile-flow-question .graph-ripple {
+  border-color: var(--forest-600);
+}
+.react-flow__edge.edge-active path,
+.react-flow__edge.edge-returned path {
+  stroke: var(--forest-600) !important;
+}
+.react-flow__edge.edge-muted path {
+  stroke: var(--hairline) !important;
+}
+.terminal,
+.terminal :is(p, span, strong, small),
+.trace-line,
+.trace-line :is(p, span, small) {
+  color: var(--surface-primary);
+}
+.terminal .terminal-tag,
+.terminal-summary,
+.trace-line.ok p > span {
+  color: var(--surface-accent);
+}
+.trace-line.denied p > span,
+.trace-line.error p > span {
+  color: var(--surface-secondary);
+}
+.terminal .button {
+  border-color: var(--dark-hairline);
+}
+.trace-line {
+  border-color: var(--dark-hairline);
+}
+.verdict-stamp {
+  position: relative;
+}
+.verdict-stamp.lime,
+.tabs button.active,
+.option-card.chosen {
+  background: var(--forest-800);
+  color: var(--surface-primary);
+}
+.option-card.chosen :is(strong, small, span),
+.option-card:hover :is(strong, small, span) {
+  color: inherit;
+}
+.option-card:hover {
+  background: var(--forest-800);
+  color: var(--surface-primary);
+}
+.option-card.chosen .option-number {
+  background: var(--forest-900);
+  color: var(--surface-primary);
+}
+.numbers .negative strong {
+  color: var(--surface-primary);
+}
+.bar-track > div {
+  background: var(--forest-600);
+  transform-origin: left;
+}
+.empty-bars i {
+  background: var(--forest-800);
+}
+.modal-heading .pill,
+.confidence .tooltip-wrap {
+  color: var(--surface-primary);
+}
+.confidence .tooltip-wrap {
+  color: var(--surface-primary);
+}
+.tooltip-wrap [role="tooltip"] {
+  background: var(--forest-900);
+  color: var(--surface-primary);
+}
+
+/* Counters reserve the exact final glyph width; no digits change surrounding layout. */
+.count-figure {
+  display: inline-grid;
+  vertical-align: baseline;
+  font-variant-numeric: tabular-nums;
+}
+.count-figure:before {
+  content: attr(data-figure);
+  visibility: hidden;
+  grid-area: 1 / 1;
+}
+.count-figure > span {
+  grid-area: 1 / 1;
+}
+.card-budget strong > .count-figure,
+.summary-total > strong > .count-figure {
+  font-size: inherit;
+  color: inherit;
+}
+.summary-costs > div,
+.summary-money > span,
+.numbers > div {
+  position: relative;
+}
+.summary-costs > div:not(.summary-total) {
+  border-bottom-color: transparent;
+}
+.summary-money > span {
+  border-top-color: transparent;
+}
+.summary-costs > div:not(.summary-total):after,
+.summary-money > span:before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  border-bottom: 1px dashed var(--dark-hairline);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 700ms var(--ease);
+  pointer-events: none;
+}
+.summary-money > span:before {
+  top: -1px;
+  bottom: auto;
+}
+.motion-row-visible:after,
+.motion-row-visible:before {
+  transform: scaleX(1) !important;
+}
+.journey-kicker.motion-row-visible,
+.card-step.motion-row-visible,
+.decision-caption.motion-row-visible {
+  animation: label-crossfade 240ms var(--ease) both;
+}
+
+/* The existing sticky boxes stay in place; only the covered card's rendering changes. */
+.journey-card {
+  transform: perspective(1000px) translateY(var(--cover-y, 0px))
+    scale(var(--cover-scale, 1)) rotateX(var(--tilt-x, 0deg))
+    rotateY(var(--tilt-y, 0deg));
+  filter: brightness(var(--cover-brightness, 1)) blur(var(--cover-blur, 0px));
+  transform-origin: center top;
+}
+.trip-summary,
+.other-decision,
+.graph-panel {
+  transform: perspective(1000px) rotateX(var(--tilt-x, 0deg))
+    rotateY(var(--tilt-y, 0deg));
+}
+@media (hover: hover) and (pointer: fine) {
+  .journey-card:before,
+  .trip-summary:before,
+  .other-decision:before,
+  .graph-panel:before {
+    content: "";
+    position: absolute;
+    width: 50px;
+    height: 100%;
+    top: 0;
+    left: 0;
+    background: transparent;
+    border-inline: 1px solid var(--mint-300);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--mint-300) 8%, transparent);
+    opacity: 0;
+    transform: translateX(var(--sheen-x, -80px)) skewX(-18deg);
+    pointer-events: none;
+    transition: opacity 240ms var(--ease);
+    z-index: 0;
+  }
+  .journey-card[data-pointer-active="true"]:before,
+  .trip-summary[data-pointer-active="true"]:before,
+  .other-decision[data-pointer-active="true"]:before,
+  .graph-panel[data-pointer-active="true"]:before {
+    opacity: 0.12;
+  }
+}
+.trip-summary,
+.other-decision,
+.graph-panel {
+  position: relative;
+}
+.trip-summary:before,
+.other-decision:before,
+.graph-panel:before {
+  clip-path: inset(0 round 14px);
+}
+.button,
+.calm-suggestions button,
+.summary-options button,
+.summary-options .plan-step {
+  background: var(--forest-800);
+  color: var(--surface-primary);
+  border-color: var(--dark-hairline);
+}
+.button,
+.calm-suggestions button,
+.summary-options button {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.button:before,
+.calm-suggestions button:before,
+.summary-options button:before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--forest-600);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 240ms var(--ease);
+}
+.button:hover:not(:disabled):before,
+.button:focus-visible:before,
+.calm-suggestions button:hover:not(:disabled):before,
+.summary-options button:hover:not(:disabled):before {
+  transform: scaleX(1);
+}
+.button:hover:not(:disabled),
+.calm-suggestions button:hover:not(:disabled) {
+  background: var(--forest-800);
+  color: var(--surface-primary);
+  box-shadow: var(--shadow);
+}
+button {
+  --press-scale: 1;
+  transform: translate(var(--hover-x, 0px), var(--hover-y, 0px))
+    scale(var(--press-scale));
+  transition: transform 240ms var(--ease);
+}
+button:active:not(:disabled),
+.button:active:not(:disabled) {
+  --press-scale: 0.98;
+  transform: translate(var(--hover-x, 0px), var(--hover-y, 0px)) scale(0.98);
+  box-shadow: var(--shadow);
+}
+.button:hover:not(:disabled),
+.calm-suggestions button:hover:not(:disabled),
+.summary-options button:hover:not(:disabled) {
+  transform: translate(var(--hover-x, 0px), var(--hover-y, 0px))
+    scale(var(--press-scale));
+}
+.button-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.button-label {
+  display: inline-block;
+}
+.button:hover:not(:disabled) .button-label {
+  animation: label-roll 280ms var(--ease) both;
+}
+.button .button-content,
+.journey-card .button .button-label,
+.trip-summary .button .button-label {
+  color: inherit;
+}
+.summary-decision[data-settling="true"]:after,
+.verdict-stamp:after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border: 1px solid var(--mint-300);
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  animation: settle-ring 800ms var(--ease) both;
+}
+@keyframes contour-drift {
+  from {
+    transform: translate(-8px, -5px);
+  }
+  to {
+    transform: translate(8px, 5px);
+  }
+}
+@keyframes status-breathe {
+  0%,
+  100% {
+    transform: scale(0.95);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+@keyframes rail-shimmer {
+  0% {
+    transform: translateX(0) skewX(-15deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.18;
+  }
+  100% {
+    transform: translateX(42px) skewX(-15deg);
+    opacity: 0;
+  }
+}
+@keyframes label-roll {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  45% {
+    transform: translateY(-110%);
+    opacity: 0;
+  }
+  55% {
+    transform: translateY(110%);
+    opacity: 0;
+  }
+}
+@keyframes label-crossfade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes settle-ring {
+  from {
+    transform: scale(1);
+    opacity: 0.35;
+  }
+  to {
+    transform: scale(1.07);
+    opacity: 0;
+  }
+}
+[data-tab-active="false"] .contour-layer,
+[data-tab-active="false"] .dock-indicator:after {
+  animation-play-state: paused;
+}
+@media (max-width: 767px) {
+  .source-dock {
+    translate: -50% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .contour-layer,
+  .context-connections {
+    display: none;
+  }
+  .dock-indicator:after,
+  .dock-icon.reading:after,
+  .verdict-stamp:after,
+  .summary-decision:after {
+    animation: none;
+  }
+  .journey-card {
+    transform: none !important;
+    filter: none !important;
+  }
+  .trip-summary,
+  .other-decision,
+  .graph-panel,
+  button {
+    transform: none !important;
+  }
+  .journey-card:before,
+  .trip-summary:before,
+  .other-decision:before,
+  .graph-panel:before {
+    display: none;
+  }
+  .background-grid {
+    transform: none;
+  }
+  .summary-costs > div:after,
+  .summary-money > span:before {
+    transform: none;
+    transition: none;
+  }
+  .button-label {
+    animation: none !important;
+  }
+}
+
+button:disabled {
+  opacity: 1;
+}
+.button:disabled {
+  background: var(--forest-900);
+  color: var(--surface-primary);
+}
+.permission button.selected,
+.prompt-chips button:hover,
+.saved-toast,
+.setup-steps .current,
+.connect-steps li.complete > span {
+  color: var(--surface-primary);
+}
+.connect-steps li.complete > span {
+  border-color: var(--dark-hairline);
+}
+.source-card.hot-plug {
+  color: var(--surface-primary);
+}
+.source-card.hot-plug :is(p, span, strong, small) {
+  color: inherit;
+}
+mark {
+  background: var(--sand-300);
+  color: var(--surface-primary);
+}
+::selection {
+  background: var(--sand-300);
+  color: var(--on-paper-primary);
+}
+.calm-loading > div {
+  background: var(--paper);
+  border-color: var(--dark-hairline);
+}
+.terminal header,
+.trace-toolbar {
+  border-color: var(--dark-hairline);
+}
+.graph-node.returned .react-flow__handle {
+  background: var(--mint-300) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .headline-line,
+  .calm-ask,
+  .calm-suggestions,
+  .source-dock {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+.journey-card[data-covered="true"] {
+  will-change: transform, filter;
+}
+.journey-card .card-step {
+  opacity: var(--label-opacity, 1);
+}
+.numbers > div.remaining {
+  border-top-color: transparent;
+}
+.numbers > div.remaining:before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -1px;
+  border-top: 1px dashed var(--hairline);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 700ms var(--ease);
+}
+@media (prefers-reduced-motion: reduce) {
+  .journey-card .card-step {
+    opacity: 1;
+  }
+  .numbers > div.remaining:before {
+    transform: none;
+    transition: none;
+  }
+}
+
+.react-flow {
+  --xy-background-color: var(--paper);
+  --xy-node-color: var(--ink);
+  --xy-node-background-color: var(--paper);
+  --xy-node-border: var(--border);
+  --xy-handle-border-color: var(--forest-800);
+  --xy-edge-label-background-color: var(--paper);
+  --xy-selection-background-color: transparent;
+  --xy-selection-border: 1px solid var(--hairline);
+}

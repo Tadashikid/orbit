@@ -1,0 +1,345 @@
+/* Foreground contexts only: existing fills, geometry and motion remain in their
+   original stylesheets. Nested filled controls establish their own context. */
+:where(
+  .surface-paper,
+  .paper,
+  .card,
+  .modal,
+  .muted,
+  .red,
+  .amber,
+  .orange,
+  .journey-stay,
+  .journey-stay .flashcard-tab,
+  .journey-stay .flashcard-details,
+  .node-provenance,
+  .graph-node,
+  .mobile-flow-source,
+  .mobile-flow-question,
+  .option-card,
+  .permission,
+  .source-mode button,
+  .warning-card,
+  .approval-note,
+  .insights-injection,
+  .error-banner,
+  .quiet-notice,
+  input,
+  textarea,
+  select,
+  mark
+) {
+  --surface-primary: var(--on-paper-primary);
+  --surface-secondary: var(--on-paper-secondary);
+  --surface-accent: var(--on-paper-primary);
+  color: var(--surface-primary);
+}
+:where(
+  .surface-forest,
+  .forest,
+  .lime,
+  .violet,
+  .pill,
+  .button,
+  .source-dock,
+  .dock-tooltip,
+  .dock-icon:hover,
+  .dock-icon:focus-visible,
+  .source-readiness,
+  .budget-read-summary,
+  .budget-added,
+  .source-mode button.selected,
+  .permission button.selected,
+  .journey-flight,
+  .journey-other,
+  .journey-flight .flashcard-tab,
+  .journey-other .flashcard-tab,
+  .journey-flight .flashcard-details,
+  .journey-other .flashcard-details,
+  .trip-summary,
+  .summary-decision,
+  .calm-footer,
+  .terminal,
+  .tool-list,
+  .calm-suggestions button,
+  .summary-options button,
+  .summary-options .plan-step,
+  .tabs button.active,
+  .option-card.chosen,
+  .option-card:hover,
+  .option-card.chosen .option-number,
+  .source-card.hot-plug,
+  .graph-node.returned,
+  .graph-node.new-source,
+  .graph-node.returned .node-provenance,
+  .mobile-flow-source.returned,
+  .mobile-flow-verdict,
+  .tooltip-wrap [role="tooltip"],
+  .calm-header .logo-mark,
+  .discreet-button:hover,
+  .header-budget:hover,
+  .prompt-chips button:hover,
+  .saved-toast,
+  .setup-steps .current,
+  .connect-steps li.complete > span
+) {
+  --surface-primary: var(--on-forest-primary);
+  --surface-secondary: var(--on-forest-secondary);
+  --surface-accent: var(--on-forest-accent);
+  color: var(--surface-primary);
+}
+/* The reference's sand is darker than paper: use the primary paper token for
+   captions too, because the secondary token would be only 3.70:1 on sand. */
+:where(
+  .journey-stay,
+  .journey-stay .flashcard-tab,
+  .red,
+  .amber,
+  .orange,
+  .warning-card,
+  .approval-note,
+  .insights-injection,
+  .error-banner,
+  .quiet-notice,
+  .graph-node.question,
+  .graph-node.calling,
+  .graph-node.blocked,
+  .mobile-flow-question
+) {
+  --surface-secondary: var(--on-paper-primary);
+}
+.permission button:nth-child(2).selected {
+  --surface-primary: var(--on-paper-primary);
+  --surface-secondary: var(--on-paper-primary);
+  --surface-accent: var(--on-paper-primary);
+}
+.surface-forest {
+  --surface-primary: var(--on-forest-primary);
+  --surface-secondary: var(--on-forest-secondary);
+  --surface-accent: var(--on-forest-accent);
+  color: var(--surface-primary);
+}
+.surface-paper {
+  --surface-primary: var(--on-paper-primary);
+  --surface-secondary: var(--on-paper-secondary);
+  --surface-accent: var(--on-paper-primary);
+  color: var(--surface-primary);
+}
+.journey-stay.surface-paper,
+.journey-stay .flashcard-tab.surface-paper {
+  --surface-secondary: var(--on-paper-primary);
+}
+.graph-node.returned .node-top > svg:last-child {
+  --surface-primary: var(--on-paper-primary);
+  color: var(--surface-primary);
+}
+/* Solid foregrounds replace permanently dimmed captions. Transient reveal and
+   scroll animations continue to be owned by motion.css. */
+.journey-card .flashcard-tab > span:first-child,
+.journey-card .card-step,
+.journey-card .flashcard-footer,
+.trip-summary .journey-kicker,
+.trip-summary .decision-caption,
+.journey-card .route-display > div > span,
+.journey-card .card-budget > span,
+.journey-card .other-cost-items > div > span:last-child,
+.trip-summary .summary-money > span,
+.trip-summary .summary-smallprint,
+.trip-summary .balance-freshness,
+.graph-node .node-caption,
+.graph-node .node-provenance,
+.terminal .trace-time,
+.terminal-empty,
+.dock-icon {
+  color: var(--surface-secondary);
+}
+.previous-verdict {
+  color: var(--surface-secondary);
+}
+.journey-card .card-budget strong,
+.journey-card .card-budget strong > span,
+.journey-card .route-display strong,
+.trip-summary .summary-total > strong > span,
+.trip-summary .summary-money strong,
+.journey-card .detail-note,
+.journey-card .detail-note p,
+.trip-summary .summary-smallprint > span,
+.trip-summary .summary-money strong span,
+.dock-icon.enabled,
+.dock-heading {
+  color: var(--surface-primary);
+}
+.journey-card .flashcard-tab > span:first-child {
+  opacity: 1;
+}
+.journey-card .flashcard-tab .tab-budget-label {
+  --surface-primary: var(--on-forest-accent);
+  --surface-secondary: var(--on-forest-accent);
+  color: var(--on-forest-accent);
+  background: var(--forest-900);
+  border: 1px solid var(--on-forest-accent);
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+.journey-card .route-display > div > span {
+  font-size: 14px;
+  font-weight: 400;
+}
+.journey-card .detail-note {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.journey-card .flight-notice {
+  background: #14392f;
+  border: 1px solid #2a7a60;
+  padding: 12px;
+  color: var(--on-forest-primary);
+}
+.journey-card .flight-notice > svg {
+  color: var(--on-forest-accent);
+}
+.button .button-content,
+.button .button-label,
+.journey-card .button .button-content,
+.journey-card .button .button-label,
+.trip-summary .button .button-content,
+.trip-summary .button .button-label {
+  color: inherit;
+}
+.journey-card .legible-cream-button,
+.trip-summary .legible-cream-button {
+  --surface-primary: var(--on-paper-primary);
+  --surface-secondary: var(--on-paper-secondary);
+  color: var(--surface-primary);
+  background: var(--on-forest-primary);
+  border: 1px solid var(--on-forest-primary);
+  font-size: 15px;
+  font-weight: 600;
+  min-height: 44px;
+}
+.legible-cream-button:before {
+  background: var(--on-forest-accent);
+}
+.journey-card .legible-cream-button:hover:not(:disabled),
+.trip-summary .legible-cream-button:hover:not(:disabled) {
+  --surface-primary: #14392f;
+  color: var(--surface-primary);
+  border-color: var(--on-forest-accent);
+  background: var(--on-forest-primary);
+}
+/* Focus keeps dark text readable over both sides of the existing mint sweep. */
+.journey-card .legible-cream-button:focus-visible,
+.trip-summary .legible-cream-button:focus-visible {
+  --surface-primary: #14392f;
+  outline: 2px solid var(--on-forest-accent);
+  outline-offset: 2px;
+}
+.journey-stay .legible-cream-button:focus-visible {
+  /* Back the requested mint focus line with a dark edge on the sand card. */
+  box-shadow:
+    0 0 0 4px var(--on-paper-primary),
+    var(--shadow);
+}
+.journey-card .legible-cream-button:disabled,
+.trip-summary .legible-cream-button:disabled {
+  --surface-primary: var(--surface-secondary);
+  background: transparent;
+  color: var(--surface-primary);
+  border-color: var(--surface-secondary);
+  opacity: 1;
+}
+.journey-flight .legible-cream-button:disabled,
+.journey-other .legible-cream-button:disabled,
+.trip-summary .legible-cream-button:disabled {
+  --surface-secondary: var(--on-forest-secondary);
+}
+.journey-stay .legible-cream-button:disabled {
+  --surface-secondary: var(--on-paper-primary);
+}
+/* Inputs/selection/disabled controls remain in the context of their own fill. */
+input,
+textarea,
+select {
+  color: var(--on-paper-primary);
+  caret-color: var(--on-paper-primary);
+}
+input::placeholder,
+textarea::placeholder,
+.calm-ask textarea::placeholder {
+  color: var(--on-paper-secondary);
+  opacity: 1;
+}
+button:disabled,
+input:disabled,
+textarea:disabled,
+select:disabled {
+  opacity: 1;
+}
+.surface-forest button:focus-visible,
+.surface-forest a:focus-visible,
+.source-dock button:focus-visible,
+.trip-summary button:focus-visible {
+  outline-color: var(--on-forest-accent);
+}
+.button:not(.legible-cream-button),
+.calm-suggestions button,
+.summary-options button,
+.summary-options .plan-step {
+  border-color: var(--on-forest-secondary);
+}
+input:not([type="checkbox"]),
+select,
+.calm-ask:focus-within {
+  border-color: var(--on-paper-secondary);
+}
+.journey-card .flashcard-tab > span:first-child,
+.journey-card .card-step,
+.journey-card .flashcard-footer,
+.journey-kicker,
+.journey-scroll-note,
+.trip-summary .decision-caption,
+.calm-footer > span:first-child,
+.landing-endnote > span,
+.demo-label {
+  font-size: 12px;
+}
+.journey-card .travel-facts,
+.journey-card .card-budget > span,
+.journey-card .other-cost-items > div > span:last-child,
+.trip-summary .summary-money,
+.trip-summary .summary-smallprint,
+.trip-summary .summary-options > span,
+.trip-summary .summary-options button,
+.trip-summary .summary-options .plan-step,
+.trip-summary .insights-link,
+.trip-summary .balance-freshness,
+.trip-summary .balance-freshness button,
+.dock-tooltip,
+.calm-footer,
+.calm-footer > span:last-child,
+.calm-footer > button,
+.estimate-disclosure,
+.landing-trust,
+.quiet-notice,
+.quiet-notice button:not(.button),
+.budget-added,
+.plain-privacy,
+.small-note,
+.field-error {
+  font-size: 14px;
+}
+.graph-node:not(.question):not(.verdict) .node-top,
+.mobile-flow-source strong,
+.option-card strong,
+.option-card small,
+.tooltip-wrap [role="tooltip"],
+.evidence-row strong,
+.why summary {
+  font-size: 14px;
+}
