@@ -4,6 +4,7 @@ import {
   Eye,
   Info,
   LogOut,
+  MessageCircle,
   SlidersHorizontal,
   Ticket,
   Wallet,
@@ -240,7 +241,9 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
     setInsights(true);
   };
   const closeInsights = useCallback(() => setInsights(false), []);
-  const hasPlan = Boolean(d.verdict || d.pending || busy || d.error);
+  // Small talk, the weather, "what did I spend": a short reply under the question, not a plan to scroll through.
+  const chat = (d.pending || d.verdict)?.verdict === "info";
+  const hasPlan = Boolean(d.verdict || d.pending || busy || d.error) && !chat;
   const flagged = d.verdict?.evidence.find((e) => INJECTED.test(e.finding));
   const scrollToPlan = () =>
     document.getElementById("plan")?.scrollIntoView({
@@ -417,7 +420,16 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
             </div>
           )}
           {d.phase === "done" && <Approvals items={d.approvals} onChange={bookingChanged} />}
-          {d.phase === "done" && !justConnected && (
+          {d.phase === "done" && chat && d.verdict && (
+            <div className="agent-reply" role="status">
+              <MessageCircle size={20} aria-hidden />
+              <div>
+                <p>{d.verdict.headline}</p>
+                {d.verdict.explanation && <p className="agent-reply-more">{d.verdict.explanation}</p>}
+              </div>
+            </div>
+          )}
+          {d.phase === "done" && !justConnected && !chat && (
             <button className="see-plan-button" onClick={scrollToPlan}>
               Your plan is ready. Scroll to explore.
             </button>

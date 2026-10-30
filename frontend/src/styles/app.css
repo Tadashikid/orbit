@@ -2650,3 +2650,28 @@
   margin: 0;
   color: var(--on-paper-secondary);
 }
+/* A short reply for small talk and questions Orbit doesn't plan (App.tsx) */
+.agent-reply {
+  width: min(760px, 100%);
+  margin: 20px auto 0;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 16px 18px;
+  border: var(--border);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--on-paper-primary);
+  box-shadow: var(--shadow);
+  text-align: left;
+}
+.agent-reply p {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.45;
+}
+.agent-reply .agent-reply-more {
+  margin-top: 6px;
+  font-size: 15px;
+  color: var(--on-paper-secondary);
+}
