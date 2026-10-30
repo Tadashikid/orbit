@@ -127,3 +127,21 @@ def test_a_stale_duffel_fare_falls_through_to_the_next(duffel, monkeypatch):
     monkeypatch.setattr(b, "_duffel", stale_first)
     h = b.hold_flight("BLR", "GOI", "2026-11-07", "Duffel Airways", "21:00", 6411)
     assert tried == ["off_same2", "off_same"] and h["details"]["order_id"] == "ord_1"  # cheapest went stale: next one
+
+
+def test_an_airline_duffel_never_sells_falls_back_to_another(duffel, monkeypatch):
+    """Duffel's test mode never sells some airlines (Air India): the outbound leg is still held, on another airline."""
+    calls, order = duffel
+    fake, tried = b._duffel, []
+
+    def duffel_airways_sold_out(method, path, body=None):
+        if path == "/air/orders" and method == "POST":
+            tried.append(body["data"]["selected_offers"][0])
+            if body["data"]["selected_offers"][0].startswith("off_same"):
+                raise ValueError("Duffel: offer_no_longer_available: Please select another offer")
+        return fake(method, path, body)
+
+    monkeypatch.setattr(b, "_duffel", duffel_airways_sold_out)
+    h = b.hold_flight("BLR", "GOI", "2026-11-07", "Duffel Airways", "21:00", 6411)
+    assert tried == ["off_same2", "off_same", "off_other"]  # the airline you priced first, then the cheapest other
+    assert h["summary"].startswith("British Airways BLR→GOI") and h["details"]["asked_for"] == "Duffel Airways"

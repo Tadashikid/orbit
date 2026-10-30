@@ -100,9 +100,11 @@ def _duffel_hold(origin, dest, date, airline):
     holdable = [o for o in request.get("offers", []) if not o["payment_requirements"]["requires_instant_payment"]]
     if not holdable:
         raise ValueError(f"Duffel has no fare from {origin} to {dest} on {date} that can be held. Book it with the airline.")
-    same = [o for o in holdable if o["owner"]["name"].lower() == airline.lower()] or holdable
-    # Fares go stale between search and order ("offer_no_longer_available"): try the next cheapest, up to 3.
-    for offer in sorted(same, key=lambda o: float(o["total_amount"]))[:3]:
+    cheapest = sorted(holdable, key=lambda o: float(o["total_amount"]))
+    same = [o for o in cheapest if o["owner"]["name"].lower() == airline.lower()]
+    # Fares go stale between search and order ("offer_no_longer_available"): the airline you priced first, then the
+    # cheapest others (Duffel's test mode never sells some airlines, e.g. Air India). The summary names who's held.
+    for offer in same[:3] + [o for o in cheapest if o not in same][:3]:
         try:
             order = _duffel("POST", "/air/orders", {"data": {
                 "type": "hold", "selected_offers": [offer["id"]],
