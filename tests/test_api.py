@@ -181,4 +181,24 @@ def test_no_holds_without_a_budget(client):
     assert not [e for e in events if e["type"] == "approval"]
     blocked = {e["guardian"] for e in events if e["type"] == "tool" and e["server"] == "booking"}
     assert blocked == {"blocked"}
-    assert "connect your budget first" in [e for e in events if e["type"] == "message"][0]["text"]
+    assert "fits your money" in [e for e in events if e["type"] == "message"][0]["text"]
+
+
+def test_book_it_still_holds_when_the_model_stops_partway(client, monkeypatch):
+    """The model checks the plan, then times out before holding anything: the rules hold the cleared plan's options."""
+    from test_agent import reply
+
+    agent_turns = iter([reply(("orbit__check_plan", {"question": Q["question"]}))])
+
+    async def flaky_model(contents, config, chain):
+        if config.system_instruction == main.agent.AGENT and (turn := next(agent_turns, None)):
+            return "fake-model", turn
+        raise RuntimeError("fake-model: TimeoutError")  # the plan's own steps fall back to the rules too
+
+    monkeypatch.setattr(main, "GEMINI", flaky_model)
+    client.post("/servers/finance/plug")
+    events = _events(client, "Book a Goa trip next weekend")
+    assert [e["action"]["kind"] for e in events if e["type"] == "approval"] == ["flight", "flight", "stay"]
+    tools = [(e["tool"], e["by"]) for e in events if e["type"] == "tool"]
+    assert tools[0] == ("check_plan", "gemini") and ("hold_flight", "rules") in tools
+    assert "on hold for you to approve" in events[-2]["text"]

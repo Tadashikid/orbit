@@ -306,23 +306,51 @@ async def _agent_events(goal, history, session=None):
         guard.saw(r)
         return r
 
-    started = False
+    async def hold(answer):
+        """"Book it", done by the rules: hold the exact options the engine priced, each one checked by Guardian.
+        Returns (events, a sentence for the reply)."""
+        events, held = [], 0
+        for name, args in _proposals(answer):
+            decision, why = guard.check(name, args)
+            h = await call(name, args) if decision == "allowed" else {
+                "server": "booking", "tool": name.partition("__")[2], "args": args, "ok": False, "ms": 0, "error": why}
+            row = agent.entry(h, "rules", decision)
+            trace.append(row)
+            events += [{"type": "tool", **row}, *flush()]
+            held += h["ok"]
+        if held:
+            return events, f" I've put {held} option{'s' if held != 1 else ''} on hold for you to approve."
+        return events, " Nothing was put on hold: Orbit only holds a plan its engine says fits your money."
+
+    started, reply, error = False, None, None
     if GEMINI:
         try:
             async for ev in agent.run(goal, history, tools, call, guard.check, GEMINI, agent.models()):
                 started = True
+                if ev["type"] == "message":  # held back: a "book it" the model didn't finish is finished below
+                    reply = ev
+                    continue
                 trace += [ev] if ev["type"] == "tool" else []
                 yield ev
                 for card in flush():
                     yield card
         except Exception as e:
-            if started:  # a plan already checked still stands on its own; otherwise say why we stopped
-                plans = [t["answer"]["verdict"]["headline"] for t in trace if t.get("answer")]
-                yield {"type": "message", "model": None, "text": plans[-1] if plans else
-                       f"The model stopped answering partway through ({str(e)[:120]}). Try again."}
-            else:
-                yield {"type": "step", "text": f"Model unavailable ({str(e)[:120]}): checking it as one plan."}
-    if not started:  # no model: the goal is checked as a single plan by the rules planner
+            error = str(e)[:120]
+            if not started:
+                yield {"type": "step", "text": f"Model unavailable ({error}): checking it as one plan."}
+    if started:
+        answers = [t["answer"] for t in trace if t.get("answer")]
+        # A plan already checked stands on its own if the model stopped partway; otherwise say why we stopped.
+        reply = reply or {"type": "message", "model": None, "text": answers[-1]["verdict"]["headline"] if answers else
+                          f"The model stopped answering partway through ({error}). Try again."}
+        tried = any(t.get("server") == "booking" for t in trace)
+        if answers and BOOK.search(goal) and not tried:  # asked to book, the model never got to it: the rules do
+            events, note = await hold(answers[-1])
+            for ev in events:
+                yield ev
+            reply["text"] += note
+        yield reply
+    else:  # no model: the goal is checked as a single plan by the rules planner
         decision, why = guard.check(agent.PLAN_TOOL["name"], {"question": goal})
         if decision != "allowed":
             yield {"type": "message", "text": f"Blocked by Orbit Guardian: {why}", "model": None}
@@ -332,20 +360,11 @@ async def _agent_events(goal, history, session=None):
             trace.append(row)
             yield {"type": "tool", **row}
             text = r["result"]["verdict"]["headline"] if r["ok"] else r["error"]
-            if r["ok"] and BOOK.search(goal):  # "book it": hold the exact options the engine priced, if Guardian agrees
-                held = 0
-                for name, args in _proposals(r["answer"]):
-                    decision, why = guard.check(name, args)
-                    h = await call(name, args) if decision == "allowed" else {
-                        "server": "booking", "tool": name.partition("__")[2], "args": args, "ok": False, "ms": 0, "error": why}
-                    hrow = agent.entry(h, "rules", decision)
-                    trace.append(hrow)
-                    yield {"type": "tool", **hrow}
-                    held += h["ok"]
-                    for card in flush():
-                        yield card
-                text += f" I've put {held} option{'s' if held != 1 else ''} on hold for you to approve." if held else \
-                    " Nothing was put on hold: connect your budget first, so Orbit can check it fits."
+            if r["ok"] and BOOK.search(goal):
+                events, note = await hold(r["answer"])
+                for ev in events:
+                    yield ev
+                text += note
             yield {"type": "message", "text": text, "model": None}
     for card in flush():
         yield card
