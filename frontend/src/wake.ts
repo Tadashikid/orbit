@@ -16,8 +16,10 @@ const recognition = () => {
   return (w.SpeechRecognition ?? w.webkitSpeechRecognition) as (new () => Recognition) | undefined;
 };
 export const wakeSupported = () => typeof window !== "undefined" && Boolean(recognition());
-// "hey orbit", "OK Orbit,", "heyorbit": a greeting is required, so the word "orbit" alone in a sentence doesn't wake it.
-const WAKE = /\b(?:hey|hi|hello|ok|okay)[\s,]*or ?bits?\b[\s,.!?]*(.*)$/i;
+// "hey orbit", "OK Orbit,", "heyorbit", or "Orbit, ..." at the very start. The word "orbit" in the middle of a sentence
+// doesn't wake it. Browsers often write the name as "Arbit", "or bit", "Orbits": those count too.
+const NAME = String.raw`(?:or[ -]?bits?|arbits?|aurbit|orbet|orbid|orbitt)`;
+const WAKE = new RegExp(String.raw`(?:^|\b(?:hey|hi|hello|ok|okay)[\s,]*)${NAME}\b[\s,.!?]*(.*)$`, "i");
 // What came after the wake phrase ("" if nothing), or null if it wasn't said.
 export function afterWake(transcript: string): string | null {
   const m = WAKE.exec(transcript);
@@ -29,6 +31,7 @@ export class WakeWord {
   constructor(
     private onWake: (rest: string) => void,
     private onError: (message: string) => void,
+    private onHeard: (transcript: string) => void = () => undefined, // what the browser hears, shown under the switch
   ) {}
   start() {
     const Recognizer = recognition();
@@ -37,11 +40,13 @@ export class WakeWord {
     this.on = true;
     const rec = new Recognizer();
     rec.continuous = true;
-    rec.interimResults = false;
+    rec.interimResults = true; // so the "Heard:" line updates as you speak; only finished phrases can wake it
     rec.lang = "en-IN";
     rec.onresult = (e) => {
       for (let i = e.resultIndex; i < e.results.length; i++) {
-        const rest = e.results[i].isFinal ? afterWake(e.results[i][0].transcript) : null;
+        const said = e.results[i][0].transcript;
+        this.onHeard(said);
+        const rest = e.results[i].isFinal ? afterWake(said) : null;
         if (rest !== null) {
           this.stop();
           this.onWake(rest);
@@ -50,10 +55,11 @@ export class WakeWord {
       }
     };
     rec.onerror = (e) => {
-      if (e.error === "not-allowed" || e.error === "service-not-allowed") {
-        this.stop();
-        this.onError("Allow the microphone to use “Hey Orbit”.");
-      }
+      if (e.error === "no-speech" || e.error === "aborted") return; // silence: it just listens again
+      this.stop();
+      this.onError(e.error === "not-allowed" || e.error === "service-not-allowed"
+        ? "Allow the microphone to use “Hey Orbit”."
+        : `“Hey Orbit” stopped listening (${e.error}). Turn it on again${e.error === "network" ? ": your browser's speech service is unreachable" : ""}.`);
     };
     rec.onend = () => {
       if (!this.on) return;

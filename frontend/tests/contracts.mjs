@@ -134,6 +134,9 @@ try {
   assert.equal(afterWake("Okay Orbit, can I buy a table?"), "can I buy a table?");
   assert.equal(afterWake("heyorbit book a goa trip"), "book a goa trip");
   assert.equal(afterWake("the orbit of the moon"), null);
+  assert.equal(afterWake("hey arbit can I buy a table"), "can I buy a table"); // how browsers often write it
+  assert.equal(afterWake("Orbit, any new emails?"), "any new emails?"); // the name first counts too
+  assert.equal(afterWake("OK or bit"), "");
   // Never shows a malformed answer, never pretends when the backend is down.
   assert.throws(() => toResult({ verdict: { verdict: "maybe" } }, on), ApiError);
   globalThis.fetch = async () => {

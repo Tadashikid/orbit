@@ -2797,3 +2797,8 @@
   background: var(--on-forest-primary);
   transform: translateX(18px);
 }
+.wake-heard {
+  margin: 4px auto 0;
+  font-size: 14px;
+  color: var(--on-paper-secondary);
+}

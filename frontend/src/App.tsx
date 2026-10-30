@@ -211,6 +211,7 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
   const getVoice = () => (voiceRef.current ??= new Voice((e) => onVoice.current(e)));
   // "Hey Orbit" (src/wake.ts): an opt-in switch. Listening pauses during a turn and resumes after Orbit has spoken.
   const [wakeOn, setWakeOn] = useState(false);
+  const [wakeHeard, setWakeHeard] = useState(""); // what the browser is transcribing: shows why a wake was missed
   const wakeOnRef = useRef(false);
   const wakeRef = useRef<WakeWord | null>(null);
   const onWake = useRef<(rest: string) => void>(() => undefined);
@@ -220,7 +221,7 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
       setVoiceError(msg);
       wakeOnRef.current = false;
       setWakeOn(false);
-    })).start();
+    }, setWakeHeard)).start();
   };
   const closeMic = () => {
     clearTimeout(quiet.current);
@@ -571,6 +572,11 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
               </span>
               “Hey Orbit” {wakeOn ? "on: say it any time" : "off"}
             </button>
+          )}
+          {wakeOn && voice === "off" && (
+            <p className="wake-heard" aria-live="polite">
+              {wakeHeard ? `Heard: “${wakeHeard.trim()}”` : "Listening for “Hey Orbit”…"}
+            </p>
           )}
           <motion.div
             className="calm-suggestions"
