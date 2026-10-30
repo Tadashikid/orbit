@@ -1,4 +1,5 @@
-// Orbit booking confirmations: an email to the user + a calendar event with them as a guest.
+// Orbit booking confirmations, one email each: a flight or stay becomes a calendar event with the user as a guest
+// (Google's invitation email carries the booking details); a shopping order, which has no event, is a plain email.
 // Runs in the demo Google account (script.google.com), called by Orbit's backend (backend/notify.py) after you
 // approve a booking. Setup:
 //   1. script.google.com > New project > paste this file over Code.gs > save.
@@ -13,11 +14,12 @@ function doPost(e) {
     var secret = PropertiesService.getScriptProperties().getProperty("ORBIT_SECRET");
     if (!secret || b.secret !== secret) return reply({ ok: false, error: "wrong secret" });
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(b.to || "")) return reply({ ok: false, error: "not an email address" });
-    MailApp.sendEmail({ to: b.to, name: "Orbit", subject: String(b.subject).slice(0, 200), body: String(b.body).slice(0, 5000) });
     var event = null;
-    if (b.event) {
+    if (!b.event) {
+      MailApp.sendEmail({ to: b.to, name: "Orbit", subject: String(b.subject).slice(0, 200), body: String(b.body).slice(0, 5000) });
+    } else {
       var cal = CalendarApp.getDefaultCalendar();
-      var options = { description: b.event.description || "", location: b.event.location || "", guests: b.to, sendInvites: true };
+      var options = { description: String(b.body).slice(0, 5000), location: b.event.location || "", guests: b.to, sendInvites: true };
       var start = new Date(b.event.start), end = new Date(b.event.end);
       event = b.event.all_day
         ? cal.createAllDayEvent(b.event.title, start, end, options)
