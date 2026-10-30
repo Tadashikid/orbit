@@ -1,7 +1,7 @@
 """POST /ask end to end: FastAPI -> registry -> real MCP servers over HTTP -> engine."""
 import json
 import sys
-from datetime import date
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -202,3 +202,22 @@ def test_book_it_still_holds_when_the_model_stops_partway(client, monkeypatch):
     tools = [(e["tool"], e["by"]) for e in events if e["type"] == "tool"]
     assert tools[0] == ("check_plan", "gemini") and ("hold_flight", "rules") in tools
     assert "on hold for you to approve" in events[-2]["text"]
+
+
+def test_bookings_window_lists_everything_and_expires_old_holds(client, monkeypatch):
+    client.post("/servers/finance/plug")
+    cards = [e["action"] for e in _events(client, "Book a Goa trip next weekend") if e["type"] == "approval"]
+    listed = client.get("/actions").json()["actions"]
+    assert [a["id"] for a in listed[:3]] == [c["id"] for c in reversed(cards)]  # newest first
+    assert all("session" not in a and "hold_id" not in a for a in listed)
+
+
+    class Later(datetime):  # an hour later: every 30-minute hold has run out
+        @classmethod
+        def now(cls, tz=None):
+            return datetime.now(tz) + timedelta(hours=1)
+
+    monkeypatch.setattr(main, "datetime", Later)
+    statuses = {a["id"]: a["status"] for a in client.get("/actions").json()["actions"]}
+    assert {statuses[c["id"]] for c in cards} == {"expired"}
+    assert client.post(f"/actions/{cards[0]['id']}/approve", json={"hash": cards[0]["hash"]}).status_code == 409

@@ -89,3 +89,12 @@ def _action(row):
     return {"id": action_id, "session": session, "hold_id": h["hold_id"], "kind": h["kind"], "summary": h["summary"],
             "amount": h["amount"], "expires_at": h["expires_at"], "hash": digest, "status": status,
             **({"outcome": json.loads(outcome)} if outcome else {})}
+
+
+def all_actions(limit=50):
+    """Every action, newest first: what the Bookings window lists."""
+    con = _db()
+    rows = con.execute("SELECT id, session, hold, hash, status, outcome FROM actions ORDER BY rowid DESC LIMIT ?",
+                       (limit,)).fetchall()
+    con.close()
+    return [_action(r) for r in rows]

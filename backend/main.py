@@ -4,6 +4,7 @@
 
 POST /login {"email", "password"}     -> sets the demo session cookie; every endpoint below needs it (401 otherwise)
 POST /logout, GET /me                  -> sign out; who is signed in
+GET  /actions                          -> every booking the agent prepared, newest first (expired holds marked)
 POST /actions/{id}/approve {"hash"}    -> confirm a hold the agent prepared (sandbox: nothing is charged)
 POST /actions/{id}/decline             -> let it go
 POST /ask {"question", "session_id"?}  -> {"verdict", "explanation", "trace", "planner", "model", "offline", "session_id"}
@@ -27,7 +28,7 @@ import os
 import re
 import time
 from collections import defaultdict
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -384,6 +385,16 @@ def _action_or_404(action_id):
     if not a:
         raise HTTPException(404, "No such action")
     return a
+
+
+@app.get("/actions")
+def list_actions():
+    """Every booking the agent prepared, newest first (the Bookings window). Holds past their expiry say so."""
+    now = datetime.now(timezone.utc)
+    for a in store.all_actions():
+        if a["status"] == "pending" and datetime.fromisoformat(a["expires_at"]) <= now:
+            store.move(a["id"], "pending", "expired")
+    return {"actions": [_public(a) for a in store.all_actions()]}
 
 
 @app.post("/actions/{action_id}/approve")
