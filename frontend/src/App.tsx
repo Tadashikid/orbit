@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Eye,
+  CalendarCheck,
   Info,
   LogOut,
   Mic,
@@ -27,7 +28,7 @@ import type { Tab } from "./screens/Panels";
 const Panels = lazy(() => import("./screens/Panels"));
 import { ConnectDialog, SetupDialog } from "./screens/Dialogs";
 import { Skeleton, Button, Chip, Modal, AnimatedAmount } from "./components/ui";
-import { api } from "./api";
+import { api, type GoogleStatus } from "./api";
 import { useDecision } from "./hooks/useDecision";
 import { Voice, voiceSummary, type VoiceEvent } from "./voice";
 import { WakeWord, wakeSupported } from "./wake";
@@ -108,6 +109,28 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
   const [asked, setAsked] = useState(HERO);
   const [tab, setTab] = useState<Tab>("verdict");
   const [setup, setSetup] = useState(false);
+  // Your own Google Calendar + Gmail, for the emails and events you approve. Google sends you back with ?google=...
+  const [google, setGoogle] = useState<GoogleStatus | null>(null);
+  const [googleNote, setGoogleNote] = useState(() => {
+    const back = new URLSearchParams(globalThis.location?.search).get("google"); // no location in the DOM tests
+    if (back) history.replaceState(null, "", location.pathname);
+    return back === "connected"
+      ? "Google connected: Orbit can now send the emails and add the events you approve."
+      : back === "cancelled"
+        ? "Google wasn't connected: you cancelled on Google's page."
+        : back
+          ? "Google couldn't be connected. Try again."
+          : "";
+  });
+  useEffect(() => {
+    api.googleStatus().then(setGoogle, () => undefined);
+  }, []);
+  const toggleGoogle = async () => {
+    if (!google?.connected) return void location.assign("/api/google/connect");
+    if (!confirm(`Disconnect ${google.email}? Orbit won't be able to send email or add events until you connect again.`)) return;
+    setGoogle(await api.disconnectGoogle());
+    setGoogleNote("Google disconnected. Orbit no longer has access.");
+  };
   const [balanceOnly, setBalanceOnly] = useState(false);
   const [connect, setConnect] = useState(false);
   const [demo, setDemo] = useState(false);
@@ -423,6 +446,17 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
             <span>Bookings</span>
             {waiting > 0 && <span className="booking-badge">{waiting}</span>}
           </button>
+          {google?.configured && (
+            <button
+              className="header-budget"
+              aria-label={google.connected ? `Google connected as ${google.email}. Disconnect` : "Connect Google"}
+              title={google.connected ? `${google.email}: click to disconnect` : "Let Orbit send emails and add events you approve"}
+              onClick={toggleGoogle}
+            >
+              <CalendarCheck size={18} />
+              <span>{google.connected ? "Google ✓" : "Connect Google"}</span>
+            </button>
+          )}
           <button
             className="discreet-button"
             aria-label="Demo controls"
@@ -437,6 +471,14 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
           )}
         </div>
       </header>
+      {googleNote && (
+        <p className="google-note" role="status">
+          {googleNote}
+          <button className="discreet-button" aria-label="Dismiss" onClick={() => setGoogleNote("")}>
+            <X size={16} />
+          </button>
+        </p>
+      )}
       <SourceDock
         servers={servers}
         disabled={busy}

@@ -2603,6 +2603,25 @@
   display: flex;
   gap: 8px;
 }
+.approval-text {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  color: var(--on-paper-secondary);
+}
+.google-note {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 8px 16px 0;
+  padding: 10px 14px;
+  border: var(--border);
+  border-radius: 10px;
+  background: var(--mint-100);
+  font-size: 14px;
+}
 .approval-confirmed {
   background: var(--mint-100);
 }

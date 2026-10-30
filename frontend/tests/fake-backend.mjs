@@ -90,6 +90,7 @@ export function fakeBackend({ finance = false, statement = false, signedIn = tru
       state.signedIn = true;
       return json({ email: DEMO_EMAIL });
     }
+    if (method === "GET" && path === "/google/status") return json({ configured: false, connected: false, email: null });
     if (method === "GET" && path === "/auth/config") return json({ google: true, demo: true });
     if (method === "POST" && path === "/auth/google") {
       // the real backend checks the token with Google; here one token stands for a verified, allowed account

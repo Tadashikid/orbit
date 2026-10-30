@@ -40,6 +40,11 @@ type AgentEvent =
   | { type: "done" }
   | { type: "approval"; action: Approval }
   | ({ type: "tool"; args?: Record<string, unknown>; error?: string; answer?: BackendAsk } & BackendTrace);
+export interface GoogleStatus {
+  configured: boolean; // the backend has an OAuth client
+  connected: boolean;
+  email: string | null;
+}
 export interface OrbitApi {
   // `onStep` gets a short, human line for each step the agent takes, as it happens.
   decide(question: string, servers: Server[], onStep?: (step: string) => void): Promise<DecisionResult>;
@@ -50,6 +55,9 @@ export interface OrbitApi {
   authConfig(): Promise<{ google: boolean; demo: boolean }>; // which ways to sign in are on
   googleLogin(idToken: string): Promise<string>; // the backend checks it with Google and sets the session cookie
   logout(): Promise<void>;
+  // Your own Google Calendar + Gmail: connecting is a page visit to /api/google/connect (Google's consent screen).
+  googleStatus(): Promise<GoogleStatus>;
+  disconnectGoogle(): Promise<GoogleStatus>;
   // Holds the agent prepared: you confirm (sending back the version you saw) or let them go.
   approve(action: Approval): Promise<Approval>;
   decline(action: Approval): Promise<Approval>;
@@ -296,6 +304,12 @@ export const api: OrbitApi = {
   async logout() {
     session = null;
     await call("/logout", {});
+  },
+  async googleStatus() {
+    return call<GoogleStatus>("/google/status");
+  },
+  async disconnectGoogle() {
+    return call<GoogleStatus>("/google/disconnect", {});
   },
   async servers() {
     return toServers(await call("/servers"));
