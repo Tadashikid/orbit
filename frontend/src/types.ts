@@ -151,7 +151,7 @@ export interface Approval {
   currency?: string; // "INR" unless a provider prices it otherwise (Duffel test fares: GBP / USD)
   expires_at: string;
   hash: string; // the version you saw; approving sends it back
-  status: "pending" | "approving" | "confirmed" | "declined" | "expired" | "failed" | "cancelled"; // cancelled: deleted
+  status: "pending" | "approving" | "confirmed" | "declined" | "expired" | "failed";
   outcome?: { reference?: string; payment?: string; error?: string; notice?: string }; // notice: the confirmation email
 }
 export interface DecisionResult {

@@ -44,36 +44,18 @@ def message(booking, outcome):
     return f"Booked: {booking['summary']}", "\n".join(lines)
 
 
-async def _post(payload):
-    """One call to the Apps Script -> its JSON answer. Raises on a network error or a non-JSON answer."""
-    # Apps Script answers through a redirect to googleusercontent.com, which serves the JSON.
-    async with _client(follow_redirects=True, timeout=20) as client:
-        return (await client.post(URL, json={"secret": SECRET, **payload})).json()
-
-
 async def confirm(to, booking, outcome):
-    """Email or calendar invitation for one confirmed booking -> {"notice": a sentence for the card, "event_id"}.
-    Empty if not set up."""
+    """Email + calendar event for one confirmed booking. Returns a sentence for the card, or None if not set up."""
     if not (URL and SECRET):
-        return {}
+        return None
     subject, body = message(booking, outcome)
     ev = event(booking)
     try:
-        r = await _post({"to": to, "subject": subject, "body": body, "event": ev})
+        # Apps Script answers through a redirect to googleusercontent.com, which serves the JSON.
+        async with _client(follow_redirects=True, timeout=20) as client:
+            r = (await client.post(URL, json={"secret": SECRET, "to": to, "subject": subject, "body": body, "event": ev})).json()
     except (httpx.HTTPError, ValueError) as e:
-        return {"notice": f"The confirmation email couldn't be sent ({type(e).__name__})."}
+        return f"The confirmation email couldn't be sent ({type(e).__name__})."
     if not r.get("ok"):
-        return {"notice": f"The confirmation email couldn't be sent ({str(r.get('error'))[:120]})."}
-    if not ev:
-        return {"notice": f"Confirmation emailed to {to}."}
-    return {"notice": f"Added to your calendar; the invitation with the details went to {to}.", "event_id": r.get("event")}
-
-
-async def cancel(event_id):
-    """Delete a booking's calendar event, without emailing anyone. True if it's gone (or there was none to delete)."""
-    if not (URL and SECRET and event_id):
-        return True
-    try:
-        return bool((await _post({"cancel_event": event_id})).get("ok"))
-    except (httpx.HTTPError, ValueError):
-        return False
+        return f"The confirmation email couldn't be sent ({str(r.get('error'))[:120]})."
+    return f"Added to your calendar; the invitation with the details went to {to}." if ev else f"Confirmation emailed to {to}."

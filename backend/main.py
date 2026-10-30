@@ -8,7 +8,6 @@ WS   /voice                            -> talk to Orbit: mic audio in, spoken re
 GET  /actions                          -> every booking the agent prepared, newest first (expired holds marked)
 POST /actions/{id}/approve {"hash"}    -> confirm a hold the agent prepared (sandbox: nothing is charged)
 POST /actions/{id}/decline             -> let it go
-POST /actions/{id}/delete              -> cancel a confirmed booking (refund, calendar event removed) or clear a card
 GET  /google/connect, /google/callback -> link your own Google Calendar + Gmail, read-only (backend/google_link.py)
 GET  /google/status, POST /google/disconnect
 POST /ask {"question", "session_id"?}  -> {"verdict", "explanation", "trace", "planner", "model", "offline", "session_id"}
@@ -551,31 +550,9 @@ async def approve(action_id: str, body: Approval, request: Request):
         store.move(_user(request), action_id, "approving", "expired" if "expired" in r["error"] else "failed", {"error": r["error"][:200]})
         raise HTTPException(409, f"Couldn't confirm it: {r['error'][-120:]}")
     outcome = {k: r["result"].get(k) for k in ("reference", "payment", "confirmed_at")}
-    sent = await notify.confirm(_user(request), r["result"], outcome)  # email / calendar invite; never fails the booking
-    store.move(_user(request), action_id, "approving", "confirmed", outcome | sent)
+    notice = await notify.confirm(_user(request), r["result"], outcome)  # email + calendar event; never fails the booking
+    store.move(_user(request), action_id, "approving", "confirmed", outcome | ({"notice": notice} if notice else {}))
     return _public(store.get_action(_user(request), action_id))
-
-
-@app.post("/actions/{action_id}/delete")
-async def delete(action_id: str, request: Request):
-    """The Delete button: a confirmed booking is cancelled with its provider and its calendar event removed (no
-    emails); a declined, expired or failed card is just cleared. Then the card is gone."""
-    me, a = _user(request), _action_or_404(request, action_id)
-    if a["status"] in ("pending", "approving"):
-        raise HTTPException(409, "This one isn't booked yet: Decline it instead.")
-    note = None
-    if a["status"] == "confirmed":
-        r = await registry.call("booking__cancel_booking", {"hold_id": a["hold_id"]})
-        guardian.audit(f"cancel: {a['summary']}", [{"server": "booking", "tool": "cancel_booking", "args": {"hold_id": a["hold_id"]},
-                                                     "by": "you", "guardian": "cancelled by you",
-                                                     "error": None if r["ok"] else r["error"][:200]}])
-        if not r["ok"]:
-            raise HTTPException(409, f"Couldn't cancel it: {r['error'][-120:]}")
-        note = r["result"].get("refund")
-        if not await notify.cancel((a.get("outcome") or {}).get("event_id")):
-            note = f"{note} Remove the calendar event yourself: Orbit couldn't."
-    store.forget_action(me, action_id)
-    return _public(a) | {"status": "cancelled", "outcome": {**(a.get("outcome") or {}), "refund": note}}
 
 
 @app.post("/actions/{action_id}/decline")

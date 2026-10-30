@@ -187,26 +187,6 @@ def release_hold(hold_id: str) -> dict:
 
 
 @mcp.tool(annotations=COMMIT)
-def cancel_booking(hold_id: str) -> dict:
-    """Cancel a confirmed booking. Only Orbit's endpoint calls this, after the user taps Delete on screen.
-    A Duffel flight is cancelled with Duffel (refunded to the test balance); a sandbox booking just ends."""
-    holds = _load()
-    h = holds.get(hold_id)
-    if not h or h["status"] not in ("confirmed", "cancelled"):
-        raise ValueError(f"no confirmed booking {hold_id}")
-    if h["status"] == "confirmed":  # idempotent: a retried cancel doesn't cancel twice
-        if h["details"].get("provider") == "duffel":
-            c = _duffel("POST", "/air/order_cancellations", {"data": {"order_id": h["details"]["order_id"]}})
-            _duffel("POST", f"/air/order_cancellations/{c['id']}/actions/confirm")
-            h["refund"] = f"Refunded {c.get('refund_currency', '')} {c.get('refund_amount', '0')} to Duffel's test balance."
-        else:
-            h["refund"] = "Sandbox: nothing was charged, so nothing to refund."
-        h["status"] = "cancelled"
-        _save(holds)
-    return {"hold_id": hold_id, **h}
-
-
-@mcp.tool(annotations=COMMIT)
 def confirm_hold(hold_id: str) -> dict:
     """Confirm a hold. Only Orbit's approval endpoint calls this, after the user approves it on screen."""
     holds = _load()

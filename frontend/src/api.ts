@@ -61,7 +61,6 @@ export interface OrbitApi {
   // Holds the agent prepared: you confirm (sending back the version you saw) or let them go.
   approve(action: Approval): Promise<Approval>;
   decline(action: Approval): Promise<Approval>;
-  remove(action: Approval): Promise<Approval>; // Delete: cancels a confirmed booking (no emails), clears any other card
   actions(): Promise<Approval[]>; // every booking, newest first (the Bookings window)
   servers(): Promise<{ servers: Server[]; today: string }>;
   setSource(id: string, on: boolean): Promise<{ servers: Server[]; today: string }>;
@@ -278,9 +277,6 @@ export const api: OrbitApi = {
   },
   async decline(action) {
     return call<Approval>(`/actions/${action.id}/decline`, {});
-  },
-  async remove(action) {
-    return call<Approval>(`/actions/${action.id}/delete`, {});
   },
   async actions() {
     return (await call<{ actions: Approval[] }>("/actions")).actions;

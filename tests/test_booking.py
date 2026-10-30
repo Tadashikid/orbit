@@ -1,4 +1,4 @@
-"""The sandbox booking server: holds are free and expire; only confirm_hold and cancel_booking commit, and it never books twice."""
+"""The sandbox booking server: holds are free and expire; only confirm_hold is a commit, and it never books twice."""
 import asyncio
 import sys
 from datetime import timedelta
@@ -19,8 +19,8 @@ def holds(monkeypatch, tmp_path):
 
 def test_only_confirm_is_destructive():
     tools = {t.name: t.annotations for t in asyncio.run(b.mcp.list_tools())}
-    assert set(tools) == {"hold_flight", "hold_stay", "hold_order", "release_hold", "confirm_hold", "cancel_booking"}
-    assert {n for n, a in tools.items() if a.destructiveHint} == {"confirm_hold", "cancel_booking"}
+    assert set(tools) == {"hold_flight", "hold_stay", "hold_order", "release_hold", "confirm_hold"}
+    assert {n for n, a in tools.items() if a.destructiveHint} == {"confirm_hold"}
     assert not any(a.readOnlyHint for a in tools.values())
 
 
@@ -145,24 +145,3 @@ def test_an_airline_duffel_never_sells_falls_back_to_another(duffel, monkeypatch
     h = b.hold_flight("BLR", "GOI", "2026-11-07", "Duffel Airways", "21:00", 6411)
     assert tried == ["off_same2", "off_same", "off_other"]  # the airline you priced first, then the cheapest other
     assert h["summary"].startswith("British Airways BLR→GOI") and h["details"]["asked_for"] == "Duffel Airways"
-
-
-def test_cancelling_a_duffel_flight_refunds_it(duffel, monkeypatch):
-    calls, order = duffel
-    fake = b._duffel
-
-    def with_cancellations(method, path, body=None):
-        if path == "/air/order_cancellations":
-            return {"id": "ore_1", "refund_amount": "91.20", "refund_currency": "GBP"}
-        if path == "/air/order_cancellations/ore_1/actions/confirm":
-            return {"id": "ore_1", "confirmed_at": "2026-10-31T10:00:00Z"}
-        return fake(method, path, body)
-
-    monkeypatch.setattr(b, "_duffel", with_cancellations)
-    h = b.hold_flight("BLR", "GOI", "2026-11-07", "Duffel Airways", "21:00", 6411)
-    b.confirm_hold(h["hold_id"])
-    with pytest.raises(ValueError):
-        b.cancel_booking(f"{h['hold_id']}x")  # no such booking
-    c = b.cancel_booking(h["hold_id"])
-    assert c["status"] == "cancelled" and c["refund"] == "Refunded GBP 91.20 to Duffel's test balance."
-    assert b.cancel_booking(h["hold_id"])["refund"] == c["refund"]  # a retry doesn't cancel twice
