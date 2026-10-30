@@ -2646,33 +2646,12 @@
   font-weight: 600;
   font-size: 14px;
 }
-.phone-alerts label > span {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
 .phone-alerts input {
   font: inherit;
   padding: 10px 12px;
   border: 1px solid color-mix(in srgb, var(--forest-800) 45%, transparent);
   border-radius: 10px;
   background: #fffaf0;
-}
-.phone-alerts-join {
-  flex-basis: 100%;
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  font-size: 14px;
-  color: var(--on-paper-secondary);
-}
-.phone-alerts-join img {
-  flex: none;
-  border-radius: 8px;
-  background: #fff;
-}
-.phone-alerts-join p {
-  margin: 0;
 }
 .phone-alerts-note {
   flex-basis: 100%;

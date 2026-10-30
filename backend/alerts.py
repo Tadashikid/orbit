@@ -6,7 +6,6 @@ or sms. Unset = no alerts; bookings work the same. Never fails a booking: whatev
 import os
 import re
 from datetime import datetime
-from urllib.parse import quote
 
 import httpx
 
@@ -14,16 +13,7 @@ SID = os.getenv("TWILIO_ACCOUNT_SID") or ""
 TOKEN = os.getenv("TWILIO_AUTH_TOKEN") or ""
 FROM = (os.getenv("TWILIO_FROM") or "").replace("whatsapp:", "").strip()
 CHANNEL = "sms" if (os.getenv("ORBIT_ALERTS") or "").lower() == "sms" else "whatsapp"
-# The WhatsApp sandbox only messages phones that joined it: its "join <code>" phrase, shown as a QR in the app.
-JOIN = (os.getenv("ORBIT_WHATSAPP_JOIN") or "").strip()
 _client = httpx.AsyncClient  # tests swap in a fake Twilio here
-
-
-def join_link():
-    """wa.me link that opens WhatsApp with the sandbox's join message typed in, or None (not WhatsApp, no phrase)."""
-    if CHANNEL != "whatsapp" or not (SID and FROM and JOIN):
-        return None
-    return f"https://wa.me/{FROM.lstrip('+')}?text={quote(JOIN)}"
 
 
 def phone(text):

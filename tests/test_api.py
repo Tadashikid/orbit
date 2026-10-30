@@ -480,9 +480,7 @@ def test_whatsapp_alerts_for_confirmed_and_cancelled_bookings(client, monkeypatc
     monkeypatch.setattr(alerts, "TOKEN", "t")
     monkeypatch.setattr(alerts, "FROM", "+14155238886")
     assert client.post("/me/phone", json={"phone": "12ab"}).status_code == 422
-    monkeypatch.setattr(alerts, "JOIN", "join twilio-trial")
-    assert client.post("/me/phone", json={"phone": "98450 12345"}).json() == {
-        "phone": "+919845012345", "alerts": "whatsapp", "join": "https://wa.me/14155238886?text=join%20twilio-trial"}
+    assert client.post("/me/phone", json={"phone": "98450 12345"}).json() == {"phone": "+919845012345", "alerts": "whatsapp"}
     client.post("/servers/finance/plug")
     out, back, stay = [e["action"] for e in _events(client, "Book a Goa trip next weekend") if e["type"] == "approval"]
 
