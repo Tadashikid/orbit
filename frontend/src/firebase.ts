@@ -61,6 +61,6 @@ export function authError(e: unknown): string | null {
   if (code === "auth/too-many-requests") return "Too many tries. Wait a minute, then try again.";
   if (code === "auth/network-request-failed") return "Can't reach Firebase. Check your internet connection.";
   if (code === "auth/operation-not-allowed")
-    return "Email sign-up isn't switched on yet: Firebase › Authentication › Sign-in method › Email/Password.";
+    return "Email + password accounts aren't switched on yet: Firebase › Authentication › Sign-in method › Email/Password.";
   return (e as Error)?.message || "That didn't work. Try again.";
 }
