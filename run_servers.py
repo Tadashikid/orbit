@@ -1,7 +1,7 @@
 """Start every MCP server in mcp_servers/ (Ctrl+C stops them all).
 
     .venv\\Scripts\\python run_servers.py
-calendar :8101 · gmail :8102 · finance :8103 · travel :8104, each at http://127.0.0.1:<port>/mcp
+calendar :8101 · gmail :8102 · finance :8103 · travel :8104 · price :8105 · booking :8106, each at http://127.0.0.1:<port>/mcp
 """
 import subprocess
 import sys

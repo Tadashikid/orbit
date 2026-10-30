@@ -2,12 +2,22 @@
 
 **Everything revolves around your life. Orbit decides with you, and shows its evidence.**
 
-Orbit answers questions like *"Can I afford a Goa trip next weekend?"* using your real constraints: calendar, deadlines, spending, and commitments. Each source plugs in through MCP, and you control which sources it may read. Permissions are enforced in code, the money math is deterministic Python, and every answer comes with a data receipt showing what was read, from where, and how fresh it was.
+Ask *"Can I afford a Goa trip next weekend?"* or *"Book it"*, by typing or by voice ("Hey Orbit"). Orbit reads your
+calendar, email deadlines and bank statement, decides with a deterministic money engine, holds the flights and hotel
+for you, and books only when you tap **Approve**. Every answer comes with a receipt of what was read and from where.
 
-- **Plan / save-the-demo:** [docs/PLAN.md](docs/PLAN.md)
-- **Spec:** [docs/TEAM_BRIEF.md](docs/TEAM_BRIEF.md)
-- **Engine ↔ UI contract:** [contracts/](contracts/)
-- **Demo persona data (Manu, synthetic):** [data/](data/)
+- **Agent:** Gemini plans the steps; every tool call goes through **Guardian** (allow-list, approvals, leak guard,
+  call budgets, audit log). The AI never does money maths and can never confirm or pay.
+- **Sources over MCP:** calendar, Gmail, finance, travel, price and booking servers you switch On/Off per account.
+- **Bookings:** Duffel test-mode flights (real API, test balance), sandbox hotels, shopping with a link to the store.
+  Approving one sends a confirmation (calendar invitation for flights and stays) via a Google Apps Script.
+- **Voice:** Gemini Live, plus an opt-in "Hey Orbit" wake word (Edge; Chrome's speech service may not connect).
+- **Accounts:** sign up / sign in with Google or email + password (Firebase Auth, verified email). Each account has
+  its own conversations, bookings, statement and switches (Firestore), can **Connect Google** to read its real
+  calendar and inbox (read-only), and can **Delete my data**.
+
+More: [docs/PLAN.md](docs/PLAN.md) · [docs/TEAM_BRIEF.md](docs/TEAM_BRIEF.md) · [contracts/](contracts/) ·
+Google + Firebase setup: [docs/GOOGLE_SETUP.md](docs/GOOGLE_SETUP.md)
 
 ## Setup (Windows)
 
@@ -15,33 +25,56 @@ Orbit answers questions like *"Can I afford a Goa trip next weekend?"* using you
 python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
 copy .env.example .env
+copy frontend\.env.example frontend\.env.local
 cd frontend && npm ci && cd ..
 ```
 
-Put your keys in `.env`. **Never commit `.env`**, `credentials.json`, `token.json`, `data/raw/`, `data/session/` or `*_cache.json`.
+Fill in `.env` (every setting is explained in [.env.example](.env.example)). Only `GEMINI_API_KEY` and a way to sign in
+(`ORBIT_DEMO_EMAIL` + `ORBIT_DEMO_PASSWORD`, or Firebase) are needed to start; everything else falls back to sample
+data or switches itself off:
+
+| Feature | Settings |
+|---|---|
+| The AI (planning, voice) | `GEMINI_API_KEY` |
+| Live flight, hotel and price search | `SERPAPI_API_KEY` |
+| Duffel test-mode flight bookings | `DUFFEL_ACCESS_TOKEN` (a `duffel_test_…` token; live tokens are refused) |
+| Google / email sign-in | `FIREBASE_PROJECT_ID`, `ORBIT_ALLOWED_EMAILS`, and `frontend/.env.local` |
+| Data in Firestore (instead of `data/session/orbit.db`) | `FIREBASE_SERVICE_ACCOUNT` |
+| Connect Google (read your calendar + inbox) | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ORBIT_TOKEN_KEY` |
+| Booking confirmations (email + calendar) | `ORBIT_NOTIFY_URL`, `ORBIT_NOTIFY_SECRET` |
+
+**Never commit** `.env`, `frontend/.env.local`, the Firebase service-account key, `credentials.json`, `token.json`,
+`data/raw/`, `data/session/` or `*_cache.json` (all gitignored).
 
 ## Run (three terminals, from the repo root)
 
 ```bash
 .venv\Scripts\python run_servers.py
 .venv\Scripts\python backend\main.py
-cd frontend && npm run dev
+npm --prefix frontend run dev
 ```
 
-- **`run_servers.py`** starts the MCP servers: calendar :8101 · gmail :8102 · finance :8103 · travel :8104 · price :8105, each at `http://127.0.0.1:<port>/mcp`.
-- **`backend\main.py`** is the API on :8000: `POST /ask`, `GET /servers`, `POST /servers/{name}/plug|unplug`, `GET|POST /statement`.
-- **The UI** (React + TypeScript + Vite) runs at http://localhost:4173 (127.0.0.1 forwards there, for Google sign-in) and proxies `/api` to :8000.
+- **`run_servers.py`** starts the MCP servers: calendar :8101 · gmail :8102 · finance :8103 · travel :8104 ·
+  price :8105 · booking :8106, each at `http://127.0.0.1:<port>/mcp`.
+- **`backend\main.py`** is the API on :8000 (the endpoint list is at the top of the file). You sign in again after
+  every backend start.
+- **The UI** runs at http://localhost:4173 (127.0.0.1 forwards there, for Google sign-in) and proxies `/api` to :8000.
 
-In the UI: ask a question → **Add your budget** (plugs Finance) → **Add a statement** → upload a CSV from `data/samples/` → **Check my plan again**.
+Try it: sign in → switch **Finance** on → **Add balance** → pick a sample statement → ask
+*"Book a Goa trip next weekend"* → open **Bookings** → **Approve**.
 
-Calendar and Gmail use seeded data until you sign in (see [docs/GOOGLE_SETUP.md](docs/GOOGLE_SETUP.md)). Set `ORBIT_OFFLINE=1` to force cache/seeded data everywhere.
+`ORBIT_OFFLINE=1` forces cached/sample data everywhere (no Google, no SerpAPI): the save-the-demo switch.
 
 ## Tests
 
 ```bash
 .venv\Scripts\python -m pytest -q
-cd frontend && npm test && npm run build
+npm --prefix frontend test
+npm --prefix frontend run build
 ```
+
+The tests never touch your real data, Google, Duffel or Firestore. The Firestore check runs only on demand:
+`FIREBASE_SERVICE_ACCOUNT=firebase-service-account.json .venv\Scripts\python -m pytest tests/test_store_firestore.py`.
 
 ## Team
 
