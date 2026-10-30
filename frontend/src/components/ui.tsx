@@ -21,6 +21,7 @@ import {
   Tag,
   MapPin,
   Eye,
+  Ticket,
 } from "lucide-react";
 export const money = (n: number) =>
   `${n < 0 ? "−" : ""}Rs ${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;
@@ -37,6 +38,7 @@ export const icons: Record<string, typeof Eye> = {
   Travel: Plane,
   "Price Check": Tag,
   Location: MapPin,
+  Bookings: Ticket,
 };
 export function Card({
   children,

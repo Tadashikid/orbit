@@ -142,7 +142,19 @@ export interface StatementInfo {
     };
   };
 }
+// A hold the agent prepared (backend/main.py /actions). Nothing is confirmed until you approve it on screen.
+export interface Approval {
+  id: string;
+  kind: "flight" | "stay" | "order";
+  summary: string;
+  amount: number;
+  expires_at: string;
+  hash: string; // the version you saw; approving sends it back
+  status: "pending" | "approving" | "confirmed" | "declined" | "expired" | "failed";
+  outcome?: { reference?: string; payment?: string; error?: string };
+}
 export interface DecisionResult {
+  approvals: Approval[];
   wire: VerdictContract;
   trace: TraceLine[];
   confidence: Verdict["confidence"];

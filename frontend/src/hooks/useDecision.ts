@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useReducedMotion } from "framer-motion";
 import { api, presentVerdict } from "../api";
-import type { Phase, Server, TraceLine, Verdict, DecisionResult } from "../types";
+import type { Approval, Phase, Server, TraceLine, Verdict, DecisionResult } from "../types";
 export function useDecision() {
   const reduced = useReducedMotion();
   const [verdict, setVerdict] = useState<Verdict | null>(null);
@@ -13,6 +13,7 @@ export function useDecision() {
   const [trace, setTrace] = useState<TraceLine[]>([]);
   const [error, setError] = useState("");
   const [step, setStep] = useState(""); // the agent's latest step, live while it works
+  const [approvals, setApprovals] = useState<Approval[]>([]); // holds waiting for you
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const token = useRef(0);
   const last = useRef<DecisionResult | null>(null);
@@ -63,6 +64,7 @@ export function useDecision() {
           setActive(read);
           setReturned(read);
           setVerdict(next);
+          setApprovals(result.approvals);
           setPending(null);
           setPhase("done");
         };
@@ -121,6 +123,7 @@ export function useDecision() {
     last.current = null;
     api.newConversation();
     setStep("");
+    setApprovals([]);
     setVerdict(null);
     setPrevious(null);
     setPending(null);
@@ -140,6 +143,9 @@ export function useDecision() {
     trace,
     error,
     step,
+    approvals,
+    // an approval card's new state, from the server (confirmed, declined, expired)
+    updateApproval: (a: Approval) => setApprovals((all) => all.map((x) => (x.id === a.id ? a : x))),
     run,
     reset,
     skip: () => finishRef.current?.(),

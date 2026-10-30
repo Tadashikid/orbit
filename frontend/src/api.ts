@@ -1,4 +1,5 @@
 import type {
+  Approval,
   DecisionResult,
   Server,
   Source,
@@ -37,6 +38,7 @@ type AgentEvent =
   | { type: "session"; id: string }
   | { type: "step" | "message"; text: string }
   | { type: "done" }
+  | { type: "approval"; action: Approval }
   | ({ type: "tool"; args?: Record<string, unknown>; error?: string; answer?: BackendAsk } & BackendTrace);
 export interface OrbitApi {
   // `onStep` gets a short, human line for each step the agent takes, as it happens.
@@ -46,6 +48,9 @@ export interface OrbitApi {
   me(): Promise<string | null>;
   login(email: string, password: string): Promise<string>;
   logout(): Promise<void>;
+  // Holds the agent prepared: you confirm (sending back the version you saw) or let them go.
+  approve(action: Approval): Promise<Approval>;
+  decline(action: Approval): Promise<Approval>;
   servers(): Promise<{ servers: Server[]; today: string }>;
   setSource(id: string, on: boolean): Promise<{ servers: Server[]; today: string }>;
   statement(): Promise<StatementInfo | null>;
@@ -59,6 +64,7 @@ const UI: Record<string, { id: string; name: string }> = {
   finance: { id: "finance", name: "Finance" },
   travel: { id: "travel", name: "Travel" },
   price: { id: "price", name: "Price Check" },
+  booking: { id: "booking", name: "Bookings" },
   orbit: { id: "orbit", name: "Orbit" },
 };
 const ui = (backend: string) => UI[backend] ?? { id: backend, name: backend };
@@ -221,6 +227,7 @@ export function toResult(r: BackendAsk, servers: Server[]): DecisionResult {
     ),
   };
   return {
+    approvals: [],
     wire,
     trace: (r.trace ?? []).map(toTrace),
     confidence: confidence(wire),
@@ -234,10 +241,15 @@ export const api: OrbitApi = {
     // The agent loop: it may check several plans; the screen shows the last one, the agent's reply as the wording.
     const plans: BackendAsk[] = [];
     const trace: BackendTrace[] = [];
+    const approvals: Approval[] = [];
     let reply = "";
     await stream("/agent", { goal: question, ...(session ? { session_id: session } : {}) }, (e) => {
       if (e.type === "session") session = e.id;
       else if (e.type === "step") onStep?.(e.text);
+      else if (e.type === "approval") {
+        approvals.push(e.action);
+        onStep?.(`Held: ${e.action.summary}`);
+      }
       else if (e.type === "message") reply = e.text;
       else if (e.type === "tool") {
         trace.push(e, ...(e.answer?.trace ?? []));
@@ -247,7 +259,13 @@ export const api: OrbitApi = {
     });
     const shown = plans.at(-1) ?? infoAnswer(question, reply);
     const wording = reply && reply !== shown.verdict.headline ? reply : shown.explanation;
-    return toResult({ ...shown, explanation: wording, trace }, servers);
+    return { ...toResult({ ...shown, explanation: wording, trace }, servers), approvals };
+  },
+  async approve(action) {
+    return call<Approval>(`/actions/${action.id}/approve`, { hash: action.hash });
+  },
+  async decline(action) {
+    return call<Approval>(`/actions/${action.id}/decline`, {});
   },
   newConversation() {
     session = null;

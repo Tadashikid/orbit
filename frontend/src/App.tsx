@@ -13,6 +13,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import SourceDock from "./components/SourceDock";
+import Approvals from "./components/Approvals";
 import { Atmosphere, ContextConnections } from "./components/Atmosphere";
 import { useSurfaceMotion } from "./hooks/useSurfaceMotion";
 import { revealEase, useMotionPreferences } from "./hooks/useMotionPreferences";
@@ -384,6 +385,7 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
               <button onClick={d.skip}>Show the answer now</button>
             </div>
           )}
+          {d.phase === "done" && <Approvals items={d.approvals} onChange={d.updateApproval} />}
           {d.phase === "done" && !justConnected && (
             <button className="see-plan-button" onClick={scrollToPlan}>
               Your plan is ready. Scroll to explore.
