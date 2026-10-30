@@ -175,15 +175,23 @@ def hold_order(item: str, store: str, price: int, link: str = "") -> dict:
 
 @mcp.tool(annotations=PREPARE)
 def release_hold(hold_id: str) -> dict:
-    """Let a hold go. Nothing was paid, so there is nothing to refund."""
-    # ponytail: a Duffel hold is only marked released here and lapses at its payment deadline; cancel it through
-    # /air/order_cancellations if seats held for days start to matter.
+    """Let a hold go. Nothing was paid, so there is nothing to refund. A Duffel hold is cancelled with Duffel too, so
+    the seat goes back now instead of at its payment deadline."""
     holds = _load()
-    if holds.get(hold_id, {}).get("status") != "held":
+    h = holds.get(hold_id, {})
+    if h.get("status") != "held":
         raise ValueError(f"no active hold {hold_id}")
-    holds[hold_id]["status"] = "released"
+    note = None
+    if h["details"].get("provider") == "duffel":
+        try:
+            c = _duffel("POST", "/air/order_cancellations", {"data": {"order_id": h["details"]["order_id"]}})
+            _duffel("POST", f"/air/order_cancellations/{c['id']}/actions/confirm")
+            note = "cancelled with Duffel"
+        except ValueError as e:  # Duffel said no: it still lapses at its deadline, nothing was paid
+            note = f"Duffel didn't cancel it ({str(e)[:120]}); it lapses at its payment deadline"
+    h["status"] = "released"
     _save(holds)
-    return {"hold_id": hold_id, "status": "released"}
+    return {"hold_id": hold_id, "status": "released", **({"duffel": note} if note else {})}
 
 
 @mcp.tool(annotations=COMMIT)

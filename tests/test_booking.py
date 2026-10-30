@@ -145,3 +145,26 @@ def test_an_airline_duffel_never_sells_falls_back_to_another(duffel, monkeypatch
     h = b.hold_flight("BLR", "GOI", "2026-11-07", "Duffel Airways", "21:00", 6411)
     assert tried == ["off_same2", "off_same", "off_other"]  # the airline you priced first, then the cheapest other
     assert h["summary"].startswith("British Airways BLR→GOI") and h["details"]["asked_for"] == "Duffel Airways"
+
+
+def test_declining_a_duffel_hold_cancels_it_with_duffel(duffel, monkeypatch):
+    calls, order = duffel
+    fake, cancelled = b._duffel, []
+
+    def with_cancellations(method, path, body=None):
+        if path.startswith("/air/order_cancellations"):
+            cancelled.append((path, body))
+        if path == "/air/order_cancellations":
+            return {"id": "ore_1", "refund_amount": "0.00"}
+        if path == "/air/order_cancellations/ore_1/actions/confirm":
+            return {"id": "ore_1"}
+        return fake(method, path, body)
+
+    monkeypatch.setattr(b, "_duffel", with_cancellations)
+    h = b.hold_flight("BLR", "GOI", "2026-11-07", "Duffel Airways", "21:00", 6411)
+    r = b.release_hold(h["hold_id"])
+    assert (r["status"], r["duffel"]) == ("released", "cancelled with Duffel")
+    assert cancelled == [("/air/order_cancellations", {"data": {"order_id": "ord_1"}}),
+                         ("/air/order_cancellations/ore_1/actions/confirm", None)]
+    with pytest.raises(ValueError):
+        b.confirm_hold(h["hold_id"])  # a released hold can't be paid any more
