@@ -30,7 +30,7 @@ cd frontend && npm run dev
 
 - **`run_servers.py`** starts the MCP servers: calendar :8101 · gmail :8102 · finance :8103 · travel :8104 · price :8105, each at `http://127.0.0.1:<port>/mcp`.
 - **`backend\main.py`** is the API on :8000: `POST /ask`, `GET /servers`, `POST /servers/{name}/plug|unplug`, `GET|POST /statement`.
-- **The UI** (React + TypeScript + Vite) runs at http://127.0.0.1:4173 and proxies `/api` to :8000.
+- **The UI** (React + TypeScript + Vite) runs at http://localhost:4173 (127.0.0.1 forwards there, for Google sign-in) and proxies `/api` to :8000.
 
 In the UI: ask a question → **Add your budget** (plugs Finance) → **Add a statement** → upload a CSV from `data/samples/` → **Check my plan again**.
 
