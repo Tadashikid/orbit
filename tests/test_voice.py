@@ -94,3 +94,18 @@ def test_voice_needs_the_login_and_a_local_page(client, monkeypatch):
         with client.websocket_connect("/voice", headers={"origin": "https://evil.example"}) as ws:
             ws.receive_json()
     assert elsewhere.value.code == 4401
+
+
+def test_a_request_heard_with_the_wake_word_goes_to_live_as_text(client, monkeypatch):
+    fake = FakeLive()
+    sent = []
+
+    async def send_client_content(turns, turn_complete):
+        sent.append((turns.parts[0].text, turn_complete))
+
+    fake.send_client_content = send_client_content
+    monkeypatch.setattr(voice, "connect", lambda: fake)
+    with client.websocket_connect("/voice", headers=LOCAL) as ws:
+        ws.send_json({"type": "text", "text": "can I buy a table"})
+        assert ws.receive_json()["type"] == "heard"  # the fake carries on as if it heard it
+    assert sent == [("can I buy a table", True)]

@@ -2,6 +2,7 @@
 
 Browser -> server   binary: mic audio, 16-bit PCM, 16 kHz, mono
                     {"type": "end"}: the user stopped talking
+                    {"type": "text", "text"}: a request already heard by the wake word ("Hey Orbit, can I buy a table?")
                     {"type": "result", "id", "text"}: what Orbit answered for an "ask"
 Server -> browser   binary: Orbit's voice, 16-bit PCM, 24 kHz, mono
                     {"type": "heard" | "said", "text"}: live transcripts of the user and of Orbit
@@ -72,6 +73,9 @@ async def bridge(ws):
                     m = json.loads(msg["text"])
                     if m.get("type") == "end":
                         await live.send_realtime_input(audio_stream_end=True)
+                    elif m.get("type") == "text" and str(m.get("text", "")).strip():  # "Hey Orbit, <request>" in one go
+                        await live.send_client_content(turns=types.Content(
+                            role="user", parts=[types.Part(text=str(m["text"])[:500])]), turn_complete=True)
                     elif m.get("type") == "result" and (f := pending.get(m.get("id"))) and not f.done():
                         f.set_result(str(m.get("text", ""))[:2000])
 
