@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import SourceDock from "./components/SourceDock";
 import Approvals from "./components/Approvals";
+import PhoneAlerts from "./components/PhoneAlerts";
 import { Atmosphere, ContextConnections } from "./components/Atmosphere";
 import { useSurfaceMotion } from "./hooks/useSurfaceMotion";
 import { revealEase, useMotionPreferences } from "./hooks/useMotionPreferences";
@@ -861,6 +862,7 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
       )}
       {bookingsOpen && (
         <Modal title="READY WHEN YOU ARE." label="your_bookings" onClose={closeBookings}>
+          <PhoneAlerts />
           {sortedBookings.length ? (
             <Approvals items={sortedBookings} onChange={bookingChanged} inWindow />
           ) : (

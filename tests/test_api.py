@@ -460,3 +460,48 @@ def test_delete_my_data_clears_everything_and_signs_out(client, monkeypatch):
     assert again.get("/statement").json() is None  # the statement is gone too
     client.post("/servers/finance/plug")
     assert client.get("/statement").json()["balance"] == STATEMENT_BALANCE  # nobody else's data was touched
+
+
+def test_whatsapp_alerts_for_confirmed_and_cancelled_bookings(client, monkeypatch):
+    """Your saved number gets one WhatsApp per booking you confirm or decline, with the reference and Orbit's id."""
+    import httpx
+
+    import alerts
+
+    sent, status = [], {"code": 201}
+
+    def twilio(request):
+        sent.append(dict(httpx.QueryParams(request.content.decode())))
+        return httpx.Response(status["code"], json={"sid": "SM1"} if status["code"] < 400 else {"message": "not in sandbox"})
+
+    real = httpx.AsyncClient
+    monkeypatch.setattr(alerts, "_client", lambda **k: real(transport=httpx.MockTransport(twilio), **k))
+    monkeypatch.setattr(alerts, "SID", "AC1")
+    monkeypatch.setattr(alerts, "TOKEN", "t")
+    monkeypatch.setattr(alerts, "FROM", "+14155238886")
+    assert client.post("/me/phone", json={"phone": "12ab"}).status_code == 422
+    assert client.post("/me/phone", json={"phone": "98450 12345"}).json() == {"phone": "+919845012345", "alerts": "whatsapp"}
+    client.post("/servers/finance/plug")
+    out, back, stay = [e["action"] for e in _events(client, "Book a Goa trip next weekend") if e["type"] == "approval"]
+
+    done = client.post(f"/actions/{out['id']}/approve", json={"hash": out["hash"]}).json()
+    assert done["outcome"]["alert"] == "WhatsApp sent to your phone (ending 2345)."
+    msg = sent[-1]
+    assert (msg["From"], msg["To"]) == ("whatsapp:+14155238886", "whatsapp:+919845012345")
+    assert "Booking confirmed" in msg["Body"] and done["outcome"]["reference"] in msg["Body"] and out["id"][:8] in msg["Body"]
+
+    gone = client.post(f"/actions/{stay['id']}/decline").json()
+    assert gone["status"] == "declined" and "Booking cancelled" in sent[-1]["Body"] and stay["id"][:8] in sent[-1]["Body"]
+
+    status["code"] = 400  # Twilio refuses (a phone that never joined the sandbox): the booking still stands
+    assert "couldn't be sent (not in sandbox)" in client.post(f"/actions/{back['id']}/approve", json={"hash": back["hash"]}).json()["outcome"]["alert"]
+    client.post("/me/phone", json={"phone": ""})  # removed: no more messages
+    assert client.get("/me/phone").json()["phone"] is None and len(sent) == 3
+
+
+def test_phone_numbers_are_checked():
+    import alerts
+
+    assert alerts.phone("+91 98450-12345") == "+919845012345" and alerts.phone("9845012345") == "+919845012345"
+    assert alerts.phone("+1 (415) 523 8886") == "+14155238886"
+    assert alerts.phone("12345") is None and alerts.phone("5845012345") is None and alerts.phone("") is None

@@ -2632,6 +2632,33 @@
   font-weight: 700;
   color: var(--forest-800);
 }
+.phone-alerts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: end;
+  margin: 0 0 12px;
+}
+.phone-alerts label {
+  display: grid;
+  gap: 6px;
+  flex: 1 1 220px;
+  font-weight: 600;
+  font-size: 14px;
+}
+.phone-alerts input {
+  font: inherit;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--forest-800) 45%, transparent);
+  border-radius: 10px;
+  background: #fffaf0;
+}
+.phone-alerts-note {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 14px;
+  color: var(--on-paper-secondary);
+}
 .google-note {
   display: flex;
   gap: 8px;

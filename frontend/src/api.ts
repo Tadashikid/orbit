@@ -55,7 +55,10 @@ export interface OrbitApi {
   authConfig(): Promise<{ google: boolean; demo: boolean }>; // which ways to sign in are on
   googleLogin(idToken: string): Promise<string>; // the backend checks it with Google and sets the session cookie
   logout(): Promise<void>;
-  deleteMe(): Promise<void>; // Delete my data: everything Orbit keeps for you, and your account; signs you out
+  deleteMe(): Promise<void>;
+  // Your number for WhatsApp / SMS booking alerts; alerts = the channel, or null when Twilio isn't set up
+  phone(): Promise<{ phone: string | null; alerts: string | null }>;
+  setPhone(phone: string): Promise<{ phone: string | null; alerts: string | null }>; // Delete my data: everything Orbit keeps for you, and your account; signs you out
   // Your own Google Calendar + Gmail, read-only: connecting is a page visit to /api/google/connect (Google's screen).
   googleStatus(): Promise<GoogleStatus>;
   disconnectGoogle(): Promise<GoogleStatus>;
@@ -305,6 +308,12 @@ export const api: OrbitApi = {
   async logout() {
     session = null;
     await call("/logout", {});
+  },
+  async phone() {
+    return call<{ phone: string | null; alerts: string | null }>("/me/phone");
+  },
+  async setPhone(phone) {
+    return call<{ phone: string | null; alerts: string | null }>("/me/phone", { phone });
   },
   async deleteMe() {
     session = null;
