@@ -1,7 +1,7 @@
 // Adapter contract: src/api.ts against real backend responses (tests/fixtures/backend.json via fake-backend.mjs).
 import assert from "node:assert/strict";
 import { createServer } from "vite";
-import { DEMO_EMAIL, DEMO_PASSWORD, fakeBackend, fixtures, HERO } from "./fake-backend.mjs";
+import { DEMO_EMAIL, DEMO_PASSWORD, GOOGLE_TOKEN, fakeBackend, fixtures, HERO } from "./fake-backend.mjs";
 const server = await createServer({
   root: process.cwd(),
   server: { middlewareMode: true },
@@ -16,6 +16,12 @@ try {
   assert.equal(await api.me(), null);
   await assert.rejects(api.login(DEMO_EMAIL, "wrong"), /Wrong email or password/);
   assert.equal(await api.login(DEMO_EMAIL, DEMO_PASSWORD), DEMO_EMAIL);
+  assert.equal(await api.me(), DEMO_EMAIL);
+  await api.logout();
+  // Google sign-in: the page asks what is on, the backend checks the token and sets the same session
+  assert.deepEqual(await api.authConfig(), { google: true, demo: true });
+  await assert.rejects(api.googleLogin("not-a-real-token"), /didn.t check out/);
+  assert.equal(await api.googleLogin(GOOGLE_TOKEN), DEMO_EMAIL);
   assert.equal(await api.me(), DEMO_EMAIL);
   await api.logout();
   assert.equal(await api.me(), null);

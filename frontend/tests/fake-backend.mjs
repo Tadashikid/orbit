@@ -9,6 +9,7 @@ export const fixtures = JSON.parse(
 export const HERO = "Can I afford a Goa trip next weekend?";
 export const DEMO_EMAIL = "lokihateshulk@gmail.com";
 export const DEMO_PASSWORD = crypto.randomUUID(); // a fresh one per run
+export const GOOGLE_TOKEN = `google-${crypto.randomUUID()}`; // stands for a Google ID token the backend accepted
 export function fakeBackend({ finance = false, statement = false, signedIn = true } = {}) {
   const listed = fixtures["GET /servers"];
   const financeTools = fixtures["POST /servers/finance/plug"].servers.find((s) => s.name === "finance").tools;
@@ -88,6 +89,13 @@ export function fakeBackend({ finance = false, statement = false, signedIn = tru
       if (body.email !== DEMO_EMAIL || body.password !== DEMO_PASSWORD) return json({ detail: "Wrong email or password" }, 401);
       state.signedIn = true;
       return json({ email: DEMO_EMAIL });
+    }
+    if (method === "GET" && path === "/auth/config") return json({ google: true, demo: true });
+    if (method === "POST" && path === "/auth/google") {
+      // the real backend checks the token with Google; here one token stands for a verified, allowed account
+      if (body.id_token !== GOOGLE_TOKEN) return json({ detail: "That Google sign-in didn't check out. Try again." }, 401);
+      state.signedIn = true;
+      return json({ email: DEMO_EMAIL, name: "Manu" });
     }
     if (method === "POST" && path === "/logout") {
       state.signedIn = false;

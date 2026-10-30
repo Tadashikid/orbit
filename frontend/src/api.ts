@@ -47,6 +47,8 @@ export interface OrbitApi {
   // The demo login: the backend sets an httpOnly cookie; the UI only learns who is signed in.
   me(): Promise<string | null>;
   login(email: string, password: string): Promise<string>;
+  authConfig(): Promise<{ google: boolean; demo: boolean }>; // which ways to sign in are on
+  googleLogin(idToken: string): Promise<string>; // the backend checks it with Google and sets the session cookie
   logout(): Promise<void>;
   // Holds the agent prepared: you confirm (sending back the version you saw) or let them go.
   approve(action: Approval): Promise<Approval>;
@@ -284,6 +286,12 @@ export const api: OrbitApi = {
   },
   async login(email, password) {
     return (await call<{ email: string }>("/login", { email, password })).email;
+  },
+  async authConfig() {
+    return call<{ google: boolean; demo: boolean }>("/auth/config");
+  },
+  async googleLogin(idToken) {
+    return (await call<{ email: string }>("/auth/google", { id_token: idToken })).email;
   },
   async logout() {
     session = null;
