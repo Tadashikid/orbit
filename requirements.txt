@@ -9,3 +9,4 @@ httpx==0.28.1
 pytest==9.1.1
 google-api-python-client==2.201.0
 google-auth-oauthlib==1.5.0
+firebase-admin==7.7.0  # Firestore storage (backend/store_firestore.py), only when FIREBASE_SERVICE_ACCOUNT is set

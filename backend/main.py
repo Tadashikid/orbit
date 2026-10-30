@@ -467,7 +467,7 @@ def list_actions(request: Request):
     me, now = _user(request), datetime.now(timezone.utc)
     for a in store.all_actions(me):
         if a["status"] == "pending" and datetime.fromisoformat(a["expires_at"]) <= now:
-            store.move(a["id"], "pending", "expired")
+            store.move(me, a["id"], "pending", "expired")
     return {"actions": [_public(a) for a in store.all_actions(me)]}
 
 
@@ -480,23 +480,23 @@ async def approve(action_id: str, body: Approval, request: Request):
     # ponytail: the cap is in rupees, so it skips other currencies; only Duffel TEST fares (GBP/USD) use them today.
     if a["currency"] == "INR" and a["amount"] > MAX_APPROVAL:
         raise HTTPException(403, f"Over your approval limit of Rs {MAX_APPROVAL:,}. Book this one yourself.")
-    if not store.move(action_id, "pending", "approving"):
+    if not store.move(_user(request), action_id, "pending", "approving"):
         raise HTTPException(409, f"This hold is already {a['status']}")
     r = await registry.call("booking__confirm_hold", {"hold_id": a["hold_id"]})
     row = {"server": "booking", "tool": "confirm_hold", "args": {"hold_id": a["hold_id"]}, "by": "you",
            "guardian": "approved by you", "error": None if r["ok"] else r["error"][:200]}
     guardian.audit(f"approve: {a['summary']}", [row])
     if not r["ok"]:
-        store.move(action_id, "approving", "expired" if "expired" in r["error"] else "failed", {"error": r["error"][:200]})
+        store.move(_user(request), action_id, "approving", "expired" if "expired" in r["error"] else "failed", {"error": r["error"][:200]})
         raise HTTPException(409, f"Couldn't confirm it: {r['error'][-120:]}")
-    store.move(action_id, "approving", "confirmed", {k: r["result"].get(k) for k in ("reference", "payment", "confirmed_at")})
+    store.move(_user(request), action_id, "approving", "confirmed", {k: r["result"].get(k) for k in ("reference", "payment", "confirmed_at")})
     return _public(store.get_action(_user(request), action_id))
 
 
 @app.post("/actions/{action_id}/decline")
 async def decline(action_id: str, request: Request):
     a = _action_or_404(request, action_id)
-    if not store.move(action_id, "pending", "declined"):
+    if not store.move(_user(request), action_id, "pending", "declined"):
         raise HTTPException(409, f"This hold is already {a['status']}")
     await registry.call("booking__release_hold", {"hold_id": a["hold_id"]})  # best effort: holds expire anyway
     guardian.audit(f"decline: {a['summary']}", [{"server": "booking", "tool": "release_hold", "args": {"hold_id": a["hold_id"]},

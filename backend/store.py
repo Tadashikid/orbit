@@ -76,12 +76,13 @@ def get_action(owner, action_id):
     return _action(row) if row else None
 
 
-def move(action_id, frm, to, outcome=None):
+def move(owner, action_id, frm, to, outcome=None):
     """pending -> approving etc. True only for the one caller that made the move."""
     con = _db()
     with con:
-        n = con.execute("UPDATE actions SET status = ?, outcome = COALESCE(?, outcome) WHERE id = ? AND status = ?",
-                        (to, json.dumps(outcome) if outcome is not None else None, action_id, frm)).rowcount
+        n = con.execute("UPDATE actions SET status = ?, outcome = COALESCE(?, outcome) WHERE id = ? AND owner = ?"
+                        " AND status = ?", (to, json.dumps(outcome) if outcome is not None else None, action_id, owner,
+                                            frm)).rowcount
     con.close()
     return n == 1
 
@@ -102,3 +103,8 @@ def all_actions(owner, limit=50):
                        " LIMIT ?", (owner, limit)).fetchall()
     con.close()
     return [_action(r) for r in rows]
+
+
+# FIREBASE_SERVICE_ACCOUNT set: the same functions, kept in Firestore instead (backend/store_firestore.py).
+if os.getenv("FIREBASE_SERVICE_ACCOUNT"):
+    from store_firestore import add_action, add_turn, all_actions, get_action, history, move  # noqa: E402,F401,F811

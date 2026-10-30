@@ -1,0 +1,10 @@
+rules_version = '2';
+// Orbit's data is only read and written by its backend (backend/store_firestore.py), with the admin key,
+// which skips these rules. No browser, signed in or not, can read or write anything directly.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
