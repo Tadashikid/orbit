@@ -278,10 +278,10 @@ def _remember(out):
 
 
 @app.post("/ask")
-async def ask(body: Question):
-    session = body.session_id or store.new_session()
-    out = await run_question(body.question, store.history(session))
-    store.add_turn(session, body.question, _remember(out))
+async def ask(body: Question, request: Request):
+    me, session = _user(request), body.session_id or store.new_session()
+    out = await run_question(body.question, store.history(me, session))
+    store.add_turn(me, session, body.question, _remember(out))
     return out | {"session_id": session}
 
 
@@ -305,17 +305,17 @@ async def voice_socket(ws: WebSocket):
 
 
 @app.post("/agent")
-async def agent_goal(body: Goal):
+async def agent_goal(body: Goal, request: Request):
     """Server-sent events: session, tool (one per call, with Guardian's decision), message, done."""
-    session = body.session_id or store.new_session()
+    me, session = _user(request), body.session_id or store.new_session()
 
     async def events():
         yield _sse({"type": "session", "id": session})
         final = None
-        async for ev in _agent_events(body.goal, store.history(session), session):
+        async for ev in _agent_events(body.goal, store.history(me, session), session, me):
             final = ev["text"] if ev["type"] == "message" else final
             yield _sse(ev)
-        store.add_turn(session, body.goal, {"headline": final})
+        store.add_turn(me, session, body.goal, {"headline": final})
         yield _sse({"type": "done"})
 
     return StreamingResponse(events(), media_type="text/event-stream")
@@ -351,7 +351,7 @@ def _proposals(answer):
 BOOK = re.compile(r"\b(book|hold|reserve|order|buy it|get it)\b", re.I)
 
 
-async def _agent_events(goal, history, session=None):
+async def _agent_events(goal, history, session=None, owner=None):
     tools = (await registry.discover())["tools"] + [agent.PLAN_TOOL]
     guard = guardian.Guard(tools, goal)
     trace, approvals = [], []
@@ -373,7 +373,7 @@ async def _agent_events(goal, history, session=None):
         else:
             r = await registry.call(name, args)
             if r["ok"] and name.startswith("booking__hold_"):
-                approvals.append(store.add_action(session, r["result"]))
+                approvals.append(store.add_action(owner, session, r["result"]))
         guard.saw(r)
         return r
 
@@ -454,27 +454,27 @@ class Approval(BaseModel):
     hash: str = Field(pattern=HEX32)  # the version of the hold you saw
 
 
-def _action_or_404(action_id):
-    a = store.get_action(action_id) if re.fullmatch(HEX32, action_id) else None
+def _action_or_404(request, action_id):
+    a = store.get_action(_user(request), action_id) if re.fullmatch(HEX32, action_id) else None
     if not a:
         raise HTTPException(404, "No such action")
     return a
 
 
 @app.get("/actions")
-def list_actions():
-    """Every booking the agent prepared, newest first (the Bookings window). Holds past their expiry say so."""
-    now = datetime.now(timezone.utc)
-    for a in store.all_actions():
+def list_actions(request: Request):
+    """Every booking the agent prepared for you, newest first (the Bookings window). Holds past their expiry say so."""
+    me, now = _user(request), datetime.now(timezone.utc)
+    for a in store.all_actions(me):
         if a["status"] == "pending" and datetime.fromisoformat(a["expires_at"]) <= now:
             store.move(a["id"], "pending", "expired")
-    return {"actions": [_public(a) for a in store.all_actions()]}
+    return {"actions": [_public(a) for a in store.all_actions(me)]}
 
 
 @app.post("/actions/{action_id}/approve")
-async def approve(action_id: str, body: Approval):
+async def approve(action_id: str, body: Approval, request: Request):
     """You approving on screen IS the authorization (like uploading a statement): the model has no way to reach this."""
-    a = _action_or_404(action_id)
+    a = _action_or_404(request, action_id)
     if not hmac.compare_digest(a["hash"].encode(), body.hash.encode()):
         raise HTTPException(409, "This hold changed since you saw it. Look at it again before approving.")
     # ponytail: the cap is in rupees, so it skips other currencies; only Duffel TEST fares (GBP/USD) use them today.
@@ -490,18 +490,18 @@ async def approve(action_id: str, body: Approval):
         store.move(action_id, "approving", "expired" if "expired" in r["error"] else "failed", {"error": r["error"][:200]})
         raise HTTPException(409, f"Couldn't confirm it: {r['error'][-120:]}")
     store.move(action_id, "approving", "confirmed", {k: r["result"].get(k) for k in ("reference", "payment", "confirmed_at")})
-    return _public(store.get_action(action_id))
+    return _public(store.get_action(_user(request), action_id))
 
 
 @app.post("/actions/{action_id}/decline")
-async def decline(action_id: str):
-    a = _action_or_404(action_id)
+async def decline(action_id: str, request: Request):
+    a = _action_or_404(request, action_id)
     if not store.move(action_id, "pending", "declined"):
         raise HTTPException(409, f"This hold is already {a['status']}")
     await registry.call("booking__release_hold", {"hold_id": a["hold_id"]})  # best effort: holds expire anyway
     guardian.audit(f"decline: {a['summary']}", [{"server": "booking", "tool": "release_hold", "args": {"hold_id": a["hold_id"]},
                                                  "by": "you", "guardian": "declined by you", "error": None}])
-    return _public(store.get_action(action_id))
+    return _public(store.get_action(_user(request), action_id))
 
 
 async def run_question(question, history=(), explain=True):

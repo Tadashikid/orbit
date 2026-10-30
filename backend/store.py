@@ -1,4 +1,7 @@
-"""Conversation sessions: one SQLite file on this machine (data/session/, gitignored). No accounts yet.
+"""Conversation sessions: one SQLite file on this machine (data/session/, gitignored).
+
+Every row has an owner (the signed-in email) and every read filters on it: one account never sees another's
+conversations or bookings, even with the other's session or action id.
 
 A session is one conversation. Each turn keeps the question and Orbit's answer (verdict + intent, never raw
 tool results), so a follow-up like "and the weekend after?" can be understood.
@@ -17,9 +20,14 @@ DB = Path(os.getenv("ORBIT_DB") or Path(__file__).resolve().parents[1] / "data" 
 def _db():
     DB.parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(DB)
-    con.execute("CREATE TABLE IF NOT EXISTS turns (session TEXT, ts TEXT, question TEXT, answer TEXT)")
+    con.execute("CREATE TABLE IF NOT EXISTS turns (session TEXT, ts TEXT, question TEXT, answer TEXT, owner TEXT)")
     con.execute("CREATE TABLE IF NOT EXISTS actions (id TEXT PRIMARY KEY, session TEXT, ts TEXT, hold TEXT, hash TEXT,"
-                " status TEXT, outcome TEXT)")
+                " status TEXT, outcome TEXT, owner TEXT)")
+    for table in ("turns", "actions"):  # a database from before accounts: its rows were the demo account's
+        if "owner" not in {c[1] for c in con.execute(f"PRAGMA table_info({table})")}:
+            with con:
+                con.execute(f"ALTER TABLE {table} ADD COLUMN owner TEXT")
+                con.execute(f"UPDATE {table} SET owner = ?", (os.getenv("ORBIT_DEMO_EMAIL") or "",))
     return con
 
 
@@ -27,19 +35,19 @@ def new_session():
     return uuid.uuid4().hex
 
 
-def add_turn(session, question, answer):
+def add_turn(owner, session, question, answer):
     con = _db()
     with con:
-        con.execute("INSERT INTO turns VALUES (?, ?, ?, ?)",
-                    (session, datetime.now(timezone.utc).isoformat(timespec="seconds"), question, json.dumps(answer)))
+        con.execute("INSERT INTO turns VALUES (?, ?, ?, ?, ?)",
+                    (session, datetime.now(timezone.utc).isoformat(timespec="seconds"), question, json.dumps(answer), owner))
     con.close()
 
 
-def history(session, limit=6):
-    """The last `limit` turns, oldest first: [{"question", "answer"}]."""
+def history(owner, session, limit=6):
+    """`owner`'s last `limit` turns in this session, oldest first: [{"question", "answer"}]."""
     con = _db()
-    rows = con.execute("SELECT question, answer FROM turns WHERE session = ? ORDER BY rowid DESC LIMIT ?",
-                       (session, limit)).fetchall()
+    rows = con.execute("SELECT question, answer FROM turns WHERE session = ? AND owner = ? ORDER BY rowid DESC LIMIT ?",
+                       (session, owner, limit)).fetchall()
     con.close()
     return [{"question": q, "answer": json.loads(a)} for q, a in reversed(rows)]
 
@@ -47,30 +55,25 @@ def history(session, limit=6):
 # Pending actions: holds the agent prepared, waiting for the user. Approving one is the only way anything is confirmed.
 # The hash pins the exact hold the user saw; status moves pending -> approving -> confirmed in one atomic update each,
 # so a double click or a retried request can't confirm twice.
-def add_action(session, hold):
+def add_action(owner, session, hold):
     action_id = uuid.uuid4().hex
     digest = hashlib.sha256(json.dumps(hold, sort_keys=True).encode()).hexdigest()[:32]
     con = _db()
     with con:
-        con.execute("INSERT INTO actions VALUES (?, ?, ?, ?, ?, 'pending', NULL)",
-                    (action_id, session, datetime.now(timezone.utc).isoformat(timespec="seconds"), json.dumps(hold), digest))
+        con.execute("INSERT INTO actions VALUES (?, ?, ?, ?, ?, 'pending', NULL, ?)",
+                    (action_id, session, datetime.now(timezone.utc).isoformat(timespec="seconds"), json.dumps(hold), digest,
+                     owner))
     con.close()
-    return get_action(action_id)
+    return get_action(owner, action_id)
 
 
-def get_action(action_id):
+def get_action(owner, action_id):
+    """None for an id that isn't `owner`'s: the same answer as an id that doesn't exist."""
     con = _db()
-    row = con.execute("SELECT id, session, hold, hash, status, outcome FROM actions WHERE id = ?", (action_id,)).fetchone()
+    row = con.execute("SELECT id, session, hold, hash, status, outcome FROM actions WHERE id = ? AND owner = ?",
+                      (action_id, owner)).fetchone()
     con.close()
     return _action(row) if row else None
-
-
-def actions(session):
-    con = _db()
-    rows = con.execute("SELECT id, session, hold, hash, status, outcome FROM actions WHERE session = ? ORDER BY rowid",
-                       (session,)).fetchall()
-    con.close()
-    return [_action(r) for r in rows]
 
 
 def move(action_id, frm, to, outcome=None):
@@ -92,10 +95,10 @@ def _action(row):
             **({"outcome": json.loads(outcome)} if outcome else {})}
 
 
-def all_actions(limit=50):
-    """Every action, newest first: what the Bookings window lists."""
+def all_actions(owner, limit=50):
+    """Every one of `owner`'s actions, newest first: what the Bookings window lists."""
     con = _db()
-    rows = con.execute("SELECT id, session, hold, hash, status, outcome FROM actions ORDER BY rowid DESC LIMIT ?",
-                       (limit,)).fetchall()
+    rows = con.execute("SELECT id, session, hold, hash, status, outcome FROM actions WHERE owner = ? ORDER BY rowid DESC"
+                       " LIMIT ?", (owner, limit)).fetchall()
     con.close()
     return [_action(r) for r in rows]

@@ -111,7 +111,7 @@ def test_ask_keeps_a_conversation(client):
     first = client.post("/ask", json=Q).json()
     sid = first["session_id"]
     client.post("/ask", json={"question": "And the weekend after?", "session_id": sid})
-    turns = store.history(sid)
+    turns = store.history(main.DEMO_EMAIL, sid)
     assert [t["question"] for t in turns] == [Q["question"], "And the weekend after?"]
     assert turns[0]["answer"] == {"verdict": first["verdict"]["verdict"], "headline": first["verdict"]["headline"], "intent": first["intent"]}
     assert client.post("/ask", json={**Q, "session_id": "../../etc/passwd"}).status_code == 422
@@ -270,11 +270,34 @@ def test_google_sign_in_checks_google_and_the_allow_list(monkeypatch):
     tokens = {k * 5: v for k, v in tokens.items()}
     assert sign_in("forged").status_code == 401  # Google's signature didn't check out
     assert sign_in("unverified").status_code == 401  # Google never confirmed the email
-    assert sign_in("stranger").status_code == 403  # not on the list while data is shared
+    assert sign_in("stranger").status_code == 403  # not on the list
     assert c.get("/me").status_code == 401
     r = sign_in("good")
     assert r.json() == {"email": "manu@gmail.com", "name": "Manu"} and "httponly" in r.headers["set-cookie"].lower()
     assert c.get("/me").json() == {"email": "manu@gmail.com"} and c.get("/servers").status_code == 200
 
-    monkeypatch.setattr(main, "ALLOWED", {"*"})  # once each user has their own data: any Google account
+    monkeypatch.setattr(main, "ALLOWED", {"*"})  # any Google account (each sees only their own, see below)
     assert sign_in("stranger").json()["email"] == "someone@gmail.com"
+
+
+def test_each_account_sees_only_its_own_bookings_and_conversations(client, monkeypatch):
+    import store
+
+    client.post("/servers/finance/plug")
+    events = _events(client, "Book a Goa trip next weekend")
+    sid = events[0]["id"]
+    mine = [e["action"] for e in events if e["type"] == "approval"]
+    assert mine and store.history(main.DEMO_EMAIL, sid)
+
+    monkeypatch.setattr(main, "FIREBASE_PROJECT_ID", "orbit-test")
+    monkeypatch.setattr(main, "ALLOWED", {"*"})
+    monkeypatch.setattr(main, "_verify_google", lambda t: {"email": "someone@gmail.com", "email_verified": True})
+    other = TestClient(main.app)
+    assert other.post("/auth/google", json={"id_token": "x" * 20}).status_code == 200
+    assert {a["id"] for a in other.get("/actions").json()["actions"]}.isdisjoint(a["id"] for a in mine)
+    for a in mine:  # knowing the id and hash isn't enough: someone else's hold doesn't exist for you
+        assert other.post(f"/actions/{a['id']}/approve", json={"hash": a["hash"]}).status_code == 404
+        assert other.post(f"/actions/{a['id']}/decline").status_code == 404
+    other.post("/ask", json={**Q, "session_id": sid})  # writing into my conversation id
+    assert [t["question"] for t in store.history(main.DEMO_EMAIL, sid)] == ["Book a Goa trip next weekend"]
+    assert {a["status"] for a in client.get("/actions").json()["actions"] if a["id"] in {m["id"] for m in mine}} == {"pending"}
