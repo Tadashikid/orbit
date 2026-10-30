@@ -81,8 +81,9 @@ class Registry:
                 tools += r
         return {"tools": tools, "offline": offline}
 
-    async def call(self, qualified_name, args=None):
-        """Route "<server>__<tool>" to its server. Never raises: failures come back with ok=False."""
+    async def call(self, qualified_name, args=None, meta=None):
+        """Route "<server>__<tool>" to its server. Never raises: failures come back with ok=False.
+        `meta` rides in the request's _meta (the user's Google token), never in `args`, so it isn't in the result."""
         server, _, tool = qualified_name.partition("__")
         out = {"server": server, "tool": tool, "args": args or {}, "ts": datetime.now(IST).isoformat(timespec="milliseconds")}
         if server not in self.plugged:
@@ -90,7 +91,7 @@ class Registry:
         start = time.perf_counter()
         try:
             async with asyncio.timeout(SLOW_S.get(server, TIMEOUT_S)), _session(self.plugged[server]) as s:
-                res = await s.call_tool(tool, args or {})
+                res = await s.call_tool(tool, args or {}, meta=meta)
             text = res.content[0].text if res.content else ""
             out.update(ok=False, error=text) if res.isError else out.update(ok=True, result=json.loads(text))
         except Exception as e:

@@ -303,66 +303,20 @@ def test_each_account_sees_only_its_own_bookings_and_conversations(client, monke
     assert {a["status"] for a in client.get("/actions").json()["actions"] if a["id"] in {m["id"] for m in mine}} == {"pending"}
 
 
-def _sent(monkeypatch, connected=True):
-    """Google, faked: records what Orbit sent or added."""
-    sent = []
-    monkeypatch.setattr(main.google_link, "status", lambda owner: {"configured": True, "connected": connected, "email": owner})
-    monkeypatch.setattr(main.google_link, "send_email", lambda owner, *a: sent.append(("email", owner, *a)) or
-                        {"reference": "Gmail m1", "payment": "Sent from your Gmail."})
-    monkeypatch.setattr(main.google_link, "add_event", lambda owner, *a: sent.append(("event", owner, *a)) or
-                        {"reference": "Google Calendar", "payment": "Added to your calendar."})
-    return sent
-
-
-def test_emails_and_events_are_drafts_until_you_approve(client, monkeypatch):
-    from test_agent import reply
-
-    goal = "Email ravi@example.com that I'll be late, and add dinner Saturday 8pm to my calendar"
-    turns = iter([reply(("orbit__draft_email", {"to": ["ravi@example.com"], "subject": "Running late", "body": "Be there by 7."}),
-                        ("orbit__draft_email", {"to": ["boss@evil.example"], "subject": "x", "body": "balance"}),  # not named
-                        ("orbit__draft_event", {"title": "Dinner", "start": "2099-01-03T20:00:00", "end": "2099-01-03T22:00:00"}),
-                        ("orbit__draft_event", {"title": "Past", "start": "2000-01-01T20:00:00", "end": "2000-01-01T21:00:00"})),
-                  reply(text="Drafted. Tap Approve to send.")])
-
-    async def model(contents, config, chain):
-        return "fake-model", next(turns)
-
-    monkeypatch.setattr(main, "GEMINI", model)
-    sent = _sent(monkeypatch, connected=False)
-    events = _events(client, goal)
-    cards = [e["action"] for e in events if e["type"] == "approval"]
-    assert [(c["kind"], c["status"]) for c in cards] == [("email", "pending"), ("event", "pending")]
-    email, event = cards
-    assert email["detail"] == {"to": ["ravi@example.com"], "subject": "Running late", "body": "Be there by 7."}
-    assert event["detail"]["start"] == "2099-01-03T20:00:00+05:30" and event["summary"] == "Dinner, Sat 03 Jan, 20:00"
-    tools = {(e["tool"], e["guardian"], e["ok"]) for e in events if e["type"] == "tool"}
-    assert ("draft_email", "blocked", False) in tools  # Guardian: only addresses you wrote
-    assert ("draft_event", "allowed", False) in tools  # a past time isn't drafted
-    assert sent == []  # nothing goes anywhere before you approve
-
-    assert client.post(f"/actions/{email['id']}/approve", json={"hash": email["hash"]}).status_code == 409  # no Google yet
-    sent = _sent(monkeypatch)
-    assert client.post(f"/actions/{email['id']}/approve", json={"hash": "0" * 32}).status_code == 409  # not what you saw
-    assert client.post(f"/actions/{email['id']}/approve", json={"hash": email["hash"]}).json()["status"] == "confirmed"
-    assert client.post(f"/actions/{email['id']}/approve", json={"hash": email["hash"]}).status_code == 409  # never twice
-    assert client.post(f"/actions/{event['id']}/decline").json()["status"] == "declined"
-    assert sent == [("email", main.DEMO_EMAIL, ["ravi@example.com"], "Running late", "Be there by 7.")]
-
-
 def test_google_connect_needs_your_own_state_cookie(client, monkeypatch):
     linked = []
     monkeypatch.setattr(main.google_link, "ready", lambda: True)
     monkeypatch.setattr(main.google_link, "finish", lambda owner, code: linked.append((owner, code)))
     r = client.get("/google/connect", follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"].startswith("https://accounts.google.com/")
+    assert "readonly" in r.headers["location"] and "send" not in r.headers["location"]  # read-only scopes
     state = r.headers["location"].split("state=")[1].split("&")[0]
     stranger = TestClient(main.app)  # Google's answer for someone who never started it here
     assert "google=expired" in stranger.get("/google/callback", params={"state": state, "code": "c"}).text
     assert "google=connected" in client.get("/google/callback", params={"state": state, "code": "c"}).text
-    assert linked == [(main.DEMO_EMAIL, "c")]
     assert "google=expired" in client.get("/google/callback", params={"state": state, "code": "c"}).text  # once only
     client.get("/google/connect", follow_redirects=False)
-    assert "location.replace(\"/?google=expired\")" in client.get("/google/callback", params={"state": "forged", "code": "c"}).text
+    assert "google=expired" in client.get("/google/callback", params={"state": "forged", "code": "c"}).text
     assert linked == [(main.DEMO_EMAIL, "c")]
 
 
@@ -380,7 +334,25 @@ def test_google_tokens_are_encrypted_per_account(monkeypatch):
     assert g.finish("owner@x.com", "code") == "me@gmail.com"
     assert "rt-secret" not in store.secret("owner@x.com", "google")  # encrypted at rest
     assert g.status("owner@x.com") == {"configured": g.ready(), "connected": True, "email": "me@gmail.com"}
-    assert g.status("someone@else.com")["connected"] is False
+    assert g.access_token("owner@x.com") == "at" and g.access_token("someone@else.com") is None
     monkeypatch.setattr(g, "httpx", type("H", (), {"post": staticmethod(lambda *a, **k: None)}))
     g.disconnect("owner@x.com")
-    assert store.secret("owner@x.com", "google") is None and not g.status("owner@x.com")["connected"]
+    assert store.secret("owner@x.com", "google") is None and g.access_token("owner@x.com") is None
+
+
+def test_your_google_token_goes_only_to_calendar_and_gmail(client, monkeypatch):
+    """Connected: Calendar and Gmail get your token in the request's _meta. Never in args, the trace or other servers."""
+    sent, real = [], main.registry.call
+
+    async def spy(name, args=None, meta=None):
+        sent.append((name.partition("__")[0], meta))
+        return await real(name, args, meta)
+
+    monkeypatch.setattr(main.registry, "call", spy)
+    monkeypatch.setattr(main.google_link, "access_token", lambda owner: f"token-of-{owner}")
+    d = client.post("/ask", json=Q).json()
+    mine = {"google_token": f"token-of-{main.DEMO_EMAIL}"}
+    assert {s for s, m in sent if m == mine} == {"calendar", "gmail"}
+    assert all(m is None for s, m in sent if s not in ("calendar", "gmail"))
+    assert "token-of" not in json.dumps(d)  # not in the answer, the trace or the evidence
+

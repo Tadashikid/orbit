@@ -93,7 +93,7 @@ def _action(row):
     h = json.loads(hold)
     return {"id": action_id, "session": session, "hold_id": h["hold_id"], "kind": h["kind"], "summary": h["summary"],
             "amount": h["amount"], "currency": h.get("currency", "INR"), "expires_at": h["expires_at"], "hash": digest,
-            "status": status, **({"detail": h["detail"]} if "detail" in h else {}),  # an email's text, an event's time
+            "status": status,
             **({"outcome": json.loads(outcome)} if outcome else {})}
 
 

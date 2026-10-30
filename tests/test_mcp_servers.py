@@ -26,8 +26,8 @@ LOCKED = {
 @pytest.fixture(autouse=True)
 def offline(monkeypatch):
     # Tests never touch Google: force the seeded fallback.
-    monkeypatch.setattr(calendar_server, "creds", lambda: None)
-    monkeypatch.setattr(gmail_server, "creds", lambda: None)
+    monkeypatch.setattr(calendar_server, "creds", lambda token=None: None)
+    monkeypatch.setattr(gmail_server, "creds", lambda token=None: None)
 
 
 def test_locked_tool_names_and_write_flags():

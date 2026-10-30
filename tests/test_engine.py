@@ -27,8 +27,8 @@ CONTRACT = json.loads((ROOT / "contracts" / "verdict.after_finance.json").read_t
 @pytest.fixture(autouse=True)
 def offline(monkeypatch, tmp_path, statement):
     # Fully seeded, so the numbers are exactly the contract's: no Google, no SerpAPI, no real flight cache.
-    monkeypatch.setattr(calendar_server, "creds", lambda: None)
-    monkeypatch.setattr(gmail_server, "creds", lambda: None)
+    monkeypatch.setattr(calendar_server, "creds", lambda token=None: None)
+    monkeypatch.setattr(gmail_server, "creds", lambda token=None: None)
     monkeypatch.setenv("ORBIT_OFFLINE", "1")
     monkeypatch.setattr(travel_server, "CACHE", tmp_path / "no_cache.json")
     monkeypatch.setattr(travel_server, "HOTELS_CACHE", tmp_path / "no_hotels_cache.json")

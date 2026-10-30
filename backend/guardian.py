@@ -24,8 +24,6 @@ from pathlib import Path
 # A tool that isn't listed doesn't run.
 POLICY = {
     "orbit__check_plan": "plan",
-    # draft: an email or calendar event shown to you as a card. Sending / adding happens only when you approve it.
-    "orbit__draft_email": "draft", "orbit__draft_event": "draft",
     "calendar__list_events": "private", "calendar__find_free_slots": "private",
     "gmail__list_tasks": "private", "gmail__get_deadlines": "private",
     "finance__get_balance": "private", "finance__get_sips": "private",
@@ -42,7 +40,6 @@ POLICY = {
 MAX_CALLS = 24  # per question; a trip needs ~8
 MAX_OUTBOUND = 8  # per question; a trip needs 3
 MAX_HOLDS = 4  # per goal: a flight out, a flight back, a stay, one spare
-MAX_DRAFTS = 3  # emails + events per goal
 CLEARS = {"yes", "yes_with_conditions", "risky"}  # engine verdicts that let the agent put a plan on hold
 AUDIT_LOG = Path(os.getenv("ORBIT_AUDIT_LOG") or Path(__file__).resolve().parents[1] / "data" / "session" / "audit.jsonl")
 EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
@@ -57,7 +54,7 @@ class Guard:
         self.tools = {t["name"]: t for t in catalogue}
         self.typed = question.replace(",", "")  # what the user said themselves is theirs to send
         self.secrets = set()
-        self.calls = self.outbound = self.holds = self.drafts = 0
+        self.calls = self.outbound = self.holds = 0
         self.cleared = False  # set once the engine says yes / yes_with_conditions / risky to a plan in this goal
 
     def check(self, name, args=None):
@@ -73,16 +70,6 @@ class Guard:
             return "needs_approval", WRITE
         if self.calls >= MAX_CALLS:
             return "blocked", f"call budget used up ({MAX_CALLS} per question)"
-        if kind == "draft":
-            if self.drafts >= MAX_DRAFTS:
-                return "blocked", f"draft limit reached ({MAX_DRAFTS} per request)"
-            # Only people you named yourself: an email or event Orbit read can't add a recipient. Its text you read
-            # on the card before approving, so it may carry your own numbers.
-            people = [*((args or {}).get("to") or []), *((args or {}).get("attendees") or [])]
-            named = {e.lower() for e in EMAIL.findall(self.typed)}
-            if any(not isinstance(a, str) or a.strip().lower() not in named for a in people):
-                return "blocked", "only send to addresses you wrote in your request"
-            self.drafts += 1
         if kind == "prepare":
             if not self.cleared:
                 return "blocked", "check the plan with your budget first: Orbit only holds what its engine says fits"

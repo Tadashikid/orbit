@@ -10,10 +10,10 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 
-from google_auth import creds
+from google_auth import creds, token_of
 
 IST = timezone(timedelta(hours=5, minutes=30))  # fixed offset: no DST, and no tzdata needed on Windows
 SEEDED = Path(__file__).resolve().parents[1] / "data" / "calendar.json"
@@ -37,9 +37,9 @@ def _range(start, end):
     return s, e
 
 
-def _events(start, end):
+def _events(start, end, token=None):
     """Events overlapping [start, end) as (title, start, end), plus source / as_of / note."""
-    c = creds()
+    c = creds(token)
     if c:
         try:
             from googleapiclient.discovery import build
@@ -70,20 +70,20 @@ def _meta(source, as_of, note):
 
 
 @mcp.tool(annotations=READ)
-def list_events(start: str, end: str) -> dict:
+def list_events(start: str, end: str, ctx: Context = None) -> dict:
     """Events between start and end (ISO date or datetime; IST if no offset). Titles and times only."""
     s, e = _range(start, end)
-    evs, *meta = _events(s, e)
+    evs, *meta = _events(s, e, token_of(ctx))
     return {"events": [{"title": t, "start": a.isoformat(), "end": b.isoformat()} for t, a, b in evs], **_meta(*meta)}
 
 
 @mcp.tool(annotations=READ)
-def find_free_slots(start: str, end: str, min_minutes: int = 60) -> dict:
+def find_free_slots(start: str, end: str, min_minutes: int = 60, ctx: Context = None) -> dict:
     """Free gaps of at least min_minutes between start and end, around existing events."""
     s, e = _range(start, end)
     if min_minutes < 1:
         raise ValueError("min_minutes must be at least 1")
-    evs, *meta = _events(s, e)
+    evs, *meta = _events(s, e, token_of(ctx))
     gap = timedelta(minutes=min_minutes)
     slots, cursor = [], s
     for _, busy_start, busy_end in sorted(evs, key=lambda x: x[1]):

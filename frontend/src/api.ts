@@ -55,7 +55,7 @@ export interface OrbitApi {
   authConfig(): Promise<{ google: boolean; demo: boolean }>; // which ways to sign in are on
   googleLogin(idToken: string): Promise<string>; // the backend checks it with Google and sets the session cookie
   logout(): Promise<void>;
-  // Your own Google Calendar + Gmail: connecting is a page visit to /api/google/connect (Google's consent screen).
+  // Your own Google Calendar + Gmail, read-only: connecting is a page visit to /api/google/connect (Google's screen).
   googleStatus(): Promise<GoogleStatus>;
   disconnectGoogle(): Promise<GoogleStatus>;
   // Holds the agent prepared: you confirm (sending back the version you saw) or let them go.

@@ -1,13 +1,9 @@
 import { useState } from "react";
-import { BedDouble, CalendarPlus, Check, Mail, Plane, ShieldCheck, ShoppingCart, X } from "lucide-react";
+import { BedDouble, Check, Plane, ShieldCheck, ShoppingCart, X } from "lucide-react";
 import { api } from "../api";
 import type { Approval } from "../types";
 import { Button, money } from "./ui";
-const KIND = { flight: Plane, stay: BedDouble, order: ShoppingCart, email: Mail, event: CalendarPlus };
-const DONE: Record<string, string> = { email: "Sent", event: "Added to your calendar" };
-const span = (d: NonNullable<Approval["detail"]>) =>
-  new Date(d.start!).toLocaleString("en-IN", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) +
-  ` to ${new Date(d.end!).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`;
+const KIND = { flight: Plane, stay: BedDouble, order: ShoppingCart };
 const time = (iso: string) => new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
 const price = (a: Approval) =>
   !a.currency || a.currency === "INR"
@@ -47,9 +43,8 @@ export default function Approvals({
       {!inWindow && <h2>Waiting for your OK</h2>}
       <p className="approvals-note">
         <ShieldCheck size={16} />
-        Orbit prepared these. Nothing is booked, paid, sent or added to your calendar until you approve. Emails and
-        events go out from your own Google account. Bookings are test mode: flights marked “Duffel test” are real
-        Duffel holds paid from a test balance; the rest is a sandbox. No real money moves.
+        Orbit put these on hold. Nothing is booked or paid until you approve. Test mode: flights marked “Duffel
+        test” are real Duffel holds paid from a test balance; the rest is a sandbox. No real money moves.
       </p>
       <ul>
         {items.map((a) => {
@@ -59,44 +54,18 @@ export default function Approvals({
               <Icon size={20} aria-hidden />
               <div className="approval-body">
                 <strong>{a.summary}</strong>
-                {a.kind === "email" && a.detail ? (
-                  <>
-                    <span>To {a.detail.to?.join(", ")}</span>
-                    <p className="approval-text">{a.detail.body}</p>
-                  </>
-                ) : a.kind === "event" && a.detail ? (
-                  <span>
-                    {span(a.detail)}
-                    {a.detail.attendees?.length ? ` · invites ${a.detail.attendees.join(", ")}` : ""}
-                  </span>
-                ) : (
-                  <span>
-                    {price(a)}
-                    {a.status === "pending" && ` · held until ${until(a.expires_at)}`}
-                  </span>
-                )}
+                <span>
+                  {price(a)}
+                  {a.status === "pending" && ` · held until ${until(a.expires_at)}`}
+                </span>
                 {a.status === "confirmed" && (
                   <span className="approval-done">
-                    <Check size={16} />
-                    {DONE[a.kind] ? (
-                      <>
-                        {DONE[a.kind]}
-                        {a.outcome?.link && (
-                          <a href={a.outcome.link} target="_blank" rel="noreferrer">
-                            Open
-                          </a>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        Confirmed · {a.outcome?.reference}. {a.outcome?.payment}
-                      </>
-                    )}
+                    <Check size={16} /> Confirmed · {a.outcome?.reference}. {a.outcome?.payment}
                   </span>
                 )}
                 {["declined", "expired", "failed"].includes(a.status) && (
                   <span className="approval-done">
-                    <X size={16} /> {a.status === "declined" ? (DONE[a.kind] ? "Discarded" : "Let go") : a.status === "expired" ? "Expired" : "Couldn't do it"}
+                    <X size={16} /> {a.status === "declined" ? "Let go" : a.status === "expired" ? "Hold expired" : "Couldn't confirm"}
                   </span>
                 )}
                 {errors[a.id] && (

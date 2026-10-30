@@ -109,13 +109,13 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
   const [asked, setAsked] = useState(HERO);
   const [tab, setTab] = useState<Tab>("verdict");
   const [setup, setSetup] = useState(false);
-  // Your own Google Calendar + Gmail, for the emails and events you approve. Google sends you back with ?google=...
+  // Your own Google Calendar + Gmail, read-only. Google sends you back here with ?google=...
   const [google, setGoogle] = useState<GoogleStatus | null>(null);
   const [googleNote, setGoogleNote] = useState(() => {
     const back = new URLSearchParams(globalThis.location?.search).get("google"); // no location in the DOM tests
     if (back) history.replaceState(null, "", location.pathname);
     return back === "connected"
-      ? "Google connected: Orbit can now send the emails and add the events you approve."
+      ? "Google connected: Orbit now reads your real calendar and inbox (read-only)."
       : back === "cancelled"
         ? "Google wasn't connected: you cancelled on Google's page."
         : back
@@ -127,7 +127,7 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
   }, []);
   const toggleGoogle = async () => {
     if (!google?.connected) return void location.assign("/api/google/connect");
-    if (!confirm(`Disconnect ${google.email}? Orbit won't be able to send email or add events until you connect again.`)) return;
+    if (!confirm(`Disconnect ${google.email}? Orbit goes back to the sample calendar and inbox.`)) return;
     setGoogle(await api.disconnectGoogle());
     setGoogleNote("Google disconnected. Orbit no longer has access.");
   };
@@ -450,7 +450,7 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
             <button
               className="header-budget"
               aria-label={google.connected ? `Google connected as ${google.email}. Disconnect` : "Connect Google"}
-              title={google.connected ? `${google.email}: click to disconnect` : "Let Orbit send emails and add events you approve"}
+              title={google.connected ? `${google.email}: click to disconnect` : "Let Orbit read your calendar and inbox"}
               onClick={toggleGoogle}
             >
               <CalendarCheck size={18} />

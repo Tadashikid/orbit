@@ -2603,13 +2603,6 @@
   display: flex;
   gap: 8px;
 }
-.approval-text {
-  margin: 4px 0 0;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  font-size: 14px;
-  color: var(--on-paper-secondary);
-}
 .google-note {
   display: flex;
   gap: 8px;

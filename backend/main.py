@@ -8,7 +8,7 @@ WS   /voice                            -> talk to Orbit: mic audio in, spoken re
 GET  /actions                          -> every booking the agent prepared, newest first (expired holds marked)
 POST /actions/{id}/approve {"hash"}    -> confirm a hold the agent prepared (sandbox: nothing is charged)
 POST /actions/{id}/decline             -> let it go
-GET  /google/connect, /google/callback -> link your own Google Calendar + Gmail (backend/google_link.py)
+GET  /google/connect, /google/callback -> link your own Google Calendar + Gmail, read-only (backend/google_link.py)
 GET  /google/status, POST /google/disconnect
 POST /ask {"question", "session_id"?}  -> {"verdict", "explanation", "trace", "planner", "model", "offline", "session_id"}
 POST /agent {"goal", "session_id"?}    -> server-sent events: session, tool, step, message, done (the agent loop)
@@ -33,7 +33,7 @@ import secrets
 import time
 from collections import defaultdict
 from contextlib import suppress
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -164,8 +164,8 @@ def me(request: Request):
     return {"email": email}
 
 
-# Link your own Google Calendar + Gmail. The state cookie ties Google's answer to you and this one attempt (no CSRF);
-# it is lax, not strict, because Google's redirect back is a navigation from accounts.google.com.
+# Link your own Google Calendar + Gmail, read-only. The state cookie ties Google's answer to you and this one attempt
+# (no CSRF); it is lax, not strict, because Google's redirect back is a navigation from accounts.google.com.
 GOOGLE_STATE = "orbit_google_state"
 
 
@@ -212,6 +212,12 @@ def google_status(request: Request):
 def google_disconnect(request: Request):
     google_link.disconnect(_user(request))
     return google_link.status(_user(request))
+
+
+async def _read(owner, name, args):
+    """A tool call; Calendar and Gmail read `owner`'s own Google when they connected it (sample data otherwise)."""
+    token = owner and name.partition("__")[0] in ("calendar", "gmail") and await asyncio.to_thread(google_link.access_token, owner)
+    return await registry.call(name, args, {"google_token": token} if token else None)
 
 
 SESSION_ID = r"^[0-9a-f]{32}$"
@@ -333,7 +339,7 @@ def _remember(out):
 @app.post("/ask")
 async def ask(body: Question, request: Request):
     me, session = _user(request), body.session_id or store.new_session()
-    out = await run_question(body.question, store.history(me, session))
+    out = await run_question(body.question, store.history(me, session), owner=me)
     store.add_turn(me, session, body.question, _remember(out))
     return out | {"session_id": session}
 
@@ -405,7 +411,7 @@ BOOK = re.compile(r"\b(book|hold|reserve|order|buy it|get it)\b", re.I)
 
 
 async def _agent_events(goal, history, session=None, owner=None):
-    tools = (await registry.discover())["tools"] + [agent.PLAN_TOOL, agent.DRAFT_EMAIL, agent.DRAFT_EVENT]
+    tools = (await registry.discover())["tools"] + [agent.PLAN_TOOL]
     guard = guardian.Guard(tools, goal)
     trace, approvals = [], []
 
@@ -418,22 +424,13 @@ async def _agent_events(goal, history, session=None, owner=None):
             start = time.perf_counter()
             r = {"server": "orbit", "tool": "check_plan", "args": args, "ts": agent._now()}
             try:
-                out = await run_question(args.get("question", ""), history, explain=False)
+                out = await run_question(args.get("question", ""), history, explain=False, owner=owner)
                 r.update(ok=True, result={"verdict": out["verdict"], "intent": out["intent"]}, answer=out)
             except Exception as e:
                 r.update(ok=False, error=f"{type(e).__name__}: {e}"[:200])
             r["ms"] = round((time.perf_counter() - start) * 1000)
-        elif name in DRAFTS:  # an email or event, as a card you approve: nothing is sent or added here
-            r = {"server": "orbit", "tool": name.partition("__")[2], "args": args, "ts": agent._now(), "ms": 0}
-            try:
-                approvals.append(store.add_action(owner, session, _draft(name, args)))
-                r.update(ok=True, result={"status": "drafted: waiting for the user to tap Approve",
-                                          "google": "connected" if google_link.status(owner)["connected"] else
-                                          "not connected: tell the user to tap Connect Google before approving"})
-            except ValueError as e:
-                r.update(ok=False, error=str(e))
         else:
-            r = await registry.call(name, args)
+            r = await _read(owner, name, args)
             if r["ok"] and name.startswith("booking__hold_"):
                 approvals.append(store.add_action(owner, session, r["result"]))
         guard.saw(r)
@@ -508,41 +505,6 @@ async def _agent_events(goal, history, session=None, owner=None):
     guardian.audit(goal, trace)
 
 
-IST = timezone(timedelta(hours=5, minutes=30))
-DRAFTS = {agent.DRAFT_EMAIL["name"], agent.DRAFT_EVENT["name"]}
-
-
-def _when(text):
-    """An event time from the model: ISO, India time unless it says otherwise."""
-    try:
-        t = datetime.fromisoformat(str(text))
-    except ValueError:
-        raise ValueError(f"not a date and time: {str(text)[:40]}") from None
-    return t if t.tzinfo else t.replace(tzinfo=IST)
-
-
-def _draft(name, args):
-    """The email or event the agent wrote, as an action: exactly what you'll read on the card and approve."""
-    now = datetime.now(timezone.utc)
-    common = {"hold_id": "", "amount": 0, "currency": "INR", "expires_at": (now + timedelta(days=7)).isoformat()}
-    if name == agent.DRAFT_EMAIL["name"]:
-        to = [a.strip() for a in args.get("to") or [] if isinstance(a, str)]
-        subject, body = str(args.get("subject") or "").strip()[:200], str(args.get("body") or "").strip()[:5000]
-        if not (to and subject and body) or not all(guardian.EMAIL.fullmatch(a) for a in to):
-            raise ValueError("an email needs valid addresses, a subject and a body")
-        return common | {"kind": "email", "summary": f"Email to {', '.join(to)}: {subject}",
-                         "detail": {"to": to, "subject": subject, "body": body}}
-    start, end = _when(args.get("start")), _when(args.get("end"))
-    title = str(args.get("title") or "").strip()[:200]
-    guests = [a.strip() for a in args.get("attendees") or [] if isinstance(a, str)]
-    if not title or end <= start or start < now or not all(guardian.EMAIL.fullmatch(a) for a in guests):
-        raise ValueError("an event needs a title, valid guests, and a future start before its end")
-    return common | {"kind": "event", "summary": f"{title}, {start.astimezone(IST):%a %d %b, %H:%M}",
-                     "expires_at": min(start, now + timedelta(days=7)).isoformat(),
-                     "detail": {"title": title, "start": start.isoformat(), "end": end.isoformat(), "attendees": guests,
-                                "description": str(args.get("description") or "")[:2000]}}
-
-
 MAX_APPROVAL = int(os.getenv("ORBIT_MAX_APPROVAL") or 50_000)  # per action, in rupees; bigger ones you do yourself
 HEX32 = r"^[0-9a-f]{32}$"
 
@@ -577,8 +539,6 @@ async def approve(action_id: str, body: Approval, request: Request):
     # ponytail: the cap is in rupees, so it skips other currencies; only Duffel TEST fares (GBP/USD) use them today.
     if a["currency"] == "INR" and a["amount"] > MAX_APPROVAL:
         raise HTTPException(403, f"Over your approval limit of Rs {MAX_APPROVAL:,}. Book this one yourself.")
-    if a["kind"] in ("email", "event"):
-        return await _send(request, a)
     if not store.move(_user(request), action_id, "pending", "approving"):
         raise HTTPException(409, f"This hold is already {a['status']}")
     r = await registry.call("booking__confirm_hold", {"hold_id": a["hold_id"]})
@@ -592,45 +552,18 @@ async def approve(action_id: str, body: Approval, request: Request):
     return _public(store.get_action(_user(request), action_id))
 
 
-async def _send(request, a):
-    """Your Approve on an email or event card: sent or added with your own Google account, once."""
-    me, d = _user(request), a["detail"]
-    if not google_link.status(me)["connected"]:
-        raise HTTPException(409, "Connect your Google account first (the Google button at the top), then approve.")
-    if not store.move(me, a["id"], "pending", "approving"):
-        raise HTTPException(409, f"This one is already {a['status']}")
-    try:
-        if a["kind"] == "email":
-            out = await asyncio.to_thread(google_link.send_email, me, d["to"], d["subject"], d["body"])
-        else:
-            out = await asyncio.to_thread(google_link.add_event, me, d["title"], d["start"], d["end"], d["description"],
-                                          d["attendees"])
-        error = None
-    except Exception as e:  # Google said no (scope removed, quota...): say so, it stays failed
-        out, error = None, f"{type(e).__name__}: {e}"[:200]
-    tool = "send_email" if a["kind"] == "email" else "add_event"
-    guardian.audit(f"approve: {a['summary']}", [{"server": "google", "tool": tool, "args": {"action": a["id"]}, "by": "you",
-                                                 "guardian": "approved by you", "error": error}])
-    if error:
-        store.move(me, a["id"], "approving", "failed", {"error": error})
-        raise HTTPException(409, f"Couldn't do it: {error[-120:]}")
-    store.move(me, a["id"], "approving", "confirmed", out)
-    return _public(store.get_action(me, a["id"]))
-
-
 @app.post("/actions/{action_id}/decline")
 async def decline(action_id: str, request: Request):
     a = _action_or_404(request, action_id)
     if not store.move(_user(request), action_id, "pending", "declined"):
         raise HTTPException(409, f"This hold is already {a['status']}")
-    if a["hold_id"]:  # emails and events hold nothing anywhere
-        await registry.call("booking__release_hold", {"hold_id": a["hold_id"]})  # best effort: holds expire anyway
+    await registry.call("booking__release_hold", {"hold_id": a["hold_id"]})  # best effort: holds expire anyway
     guardian.audit(f"decline: {a['summary']}", [{"server": "booking", "tool": "release_hold", "args": {"hold_id": a["hold_id"]},
                                                  "by": "you", "guardian": "declined by you", "error": None}])
     return _public(store.get_action(_user(request), action_id))
 
 
-async def run_question(question, history=(), explain=True):
+async def run_question(question, history=(), explain=True, owner=None):
     """One question through the whole pipeline: understand, read (Guardian on every call), engine, explain."""
     catalogue = await registry.discover()
     tools = catalogue["tools"]
@@ -639,7 +572,7 @@ async def run_question(question, history=(), explain=True):
     check = guard.check
 
     async def call(name, args):
-        r = await registry.call(name, args)
+        r = await _read(owner, name, args)
         guard.saw(r)  # private values read here can't leave in a later outbound call
         return r
 

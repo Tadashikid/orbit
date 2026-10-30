@@ -1,16 +1,17 @@
-"""Each Orbit user's own Google Calendar and Gmail: connect once, then Orbit can add events and send emails you approved.
+"""Each Orbit user's own Google Calendar and Gmail, read-only: connect once, and Orbit reads your real events and
+inbox instead of the sample data.
 
 - Connect is Google's OAuth web flow (offline access). The refresh token is encrypted with ORBIT_TOKEN_KEY (Fernet,
   only on this machine) before it's stored under your account (store.py / Firestore): a leaked database alone can't
   read anyone's mail.
-- Scopes: add/change calendar events, send mail. Not read your inbox or delete anything.
-- Nothing here runs on the model's say-so: the approval endpoint calls send_email / add_event after you tap Approve.
+- Scopes: read calendar, read mail. Orbit can't send, change or delete anything.
+- The Calendar and Gmail servers get an hour's access token per call, in the MCP request's metadata (never in the
+  tool arguments, so it never reaches the model, the trace or the audit log).
 """
 import base64
 import json
 import os
 import time
-from email.message import EmailMessage
 from urllib.parse import urlencode
 
 import httpx
@@ -23,7 +24,7 @@ CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET") or ""
 KEY = os.getenv("ORBIT_TOKEN_KEY") or ""
 # Must match an "Authorized redirect URI" on the OAuth client. The UI's dev server proxies /api to the backend.
 REDIRECT = (os.getenv("ORBIT_PUBLIC_URL") or "http://localhost:4173").rstrip("/") + "/api/google/callback"
-SCOPES = "openid email https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/gmail.send"
+SCOPES = "openid email https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.readonly"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 TZ = "Asia/Kolkata"
 _access = {}  # owner -> (access token, expires at): an hour's token, kept in memory only
@@ -81,33 +82,17 @@ def disconnect(owner):
     _access.pop(owner, None)
 
 
-def _bearer(owner):
+def access_token(owner):
+    """An hour's access token for `owner`'s Google, or None if they haven't connected (or it was revoked)."""
     token, until = _access.get(owner, (None, 0))
     if time.time() < until:
-        return {"Authorization": f"Bearer {token}"}
+        return token
     s = _saved(owner)
     if not s:
-        raise PermissionError("Connect your Google account first (the Google button at the top).")
-    t = _token(refresh_token=s["refresh_token"], grant_type="refresh_token")
+        return None
+    try:
+        t = _token(refresh_token=s["refresh_token"], grant_type="refresh_token")
+    except httpx.HTTPError:  # revoked on Google's side, or Google unreachable: read the sample data this time
+        return None
     _access[owner] = (t["access_token"], time.time() + t.get("expires_in", 3600) - 60)
-    return {"Authorization": f"Bearer {t['access_token']}"}
-
-
-def send_email(owner, to, subject, body):
-    msg = EmailMessage()
-    msg["To"], msg["Subject"] = ", ".join(to), subject
-    msg.set_content(body)
-    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
-    r = httpx.post("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", headers=_bearer(owner),
-                   json={"raw": raw}, timeout=20)
-    r.raise_for_status()
-    return {"reference": f"Gmail {r.json()['id']}", "payment": "Sent from your Gmail."}
-
-
-def add_event(owner, title, start, end, description="", attendees=()):
-    event = {"summary": title, "description": description, "start": {"dateTime": start, "timeZone": TZ},
-             "end": {"dateTime": end, "timeZone": TZ}, "attendees": [{"email": a} for a in attendees]}
-    r = httpx.post("https://www.googleapis.com/calendar/v3/calendars/primary/events", headers=_bearer(owner),
-                   params={"sendUpdates": "all" if attendees else "none"}, json=event, timeout=20)
-    r.raise_for_status()
-    return {"reference": "Google Calendar", "payment": "Added to your calendar.", "link": r.json().get("htmlLink")}
+    return t["access_token"]

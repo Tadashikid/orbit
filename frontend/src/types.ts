@@ -145,16 +145,14 @@ export interface StatementInfo {
 // A hold the agent prepared (backend/main.py /actions). Nothing is confirmed until you approve it on screen.
 export interface Approval {
   id: string;
-  kind: "flight" | "stay" | "order" | "email" | "event";
+  kind: "flight" | "stay" | "order";
   summary: string;
   amount: number;
   currency?: string; // "INR" unless a provider prices it otherwise (Duffel test fares: GBP / USD)
   expires_at: string;
   hash: string; // the version you saw; approving sends it back
   status: "pending" | "approving" | "confirmed" | "declined" | "expired" | "failed";
-  outcome?: { reference?: string; payment?: string; error?: string; link?: string };
-  // An email's exact text or an event's time: what you read before approving. Holds have none.
-  detail?: { to?: string[]; subject?: string; body?: string; title?: string; start?: string; end?: string; attendees?: string[] };
+  outcome?: { reference?: string; payment?: string; error?: string };
 }
 export interface DecisionResult {
   approvals: Approval[];

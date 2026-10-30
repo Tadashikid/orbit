@@ -51,9 +51,6 @@ AGENT = """You are Orbit, a personal assistant that works through the user's GOA
   with the money checked, put the exact options from that verdict's breakdown on hold with the booking__hold_* tools
   (each flight leg, the hotel, or the top offer). Holds are free and reversible.
 - You can never confirm, buy or pay. The user approves each hold on screen and pays the provider themselves. Say so.
-- To send an email or add a calendar event, call orbit__draft_email or orbit__draft_event with the full text. Emails
-  go only to addresses the user wrote in their goal. Write the email in the user's voice, short and plain. Event times
-  are India time, like 2026-10-31T17:00:00. Nothing is sent or added until the user taps Approve on the card: say so.
 - When done, answer in at most 5 short sentences, using only numbers the tools returned, written like Rs 9,350."""
 
 VOICE = """You are Orbit's voice: friendly, brief, spoken English (the user is in India; money is in rupees).
@@ -61,8 +58,6 @@ VOICE = """You are Orbit's voice: friendly, brief, spoken English (the user is i
   savings goals, the user's calendar, emails and deadlines, their spending and budget, and bookings. For ANY of these,
   call ask_orbit with the user's request in their own words, then say what it returned in one or two short sentences.
   Never answer those from memory. When unsure whether Orbit handles something, call ask_orbit anyway: it says if not.
-- Sending an email or adding a calendar event: also call ask_orbit, with the address, time and what to say. It makes
-  a draft card; nothing is sent until the user taps Approve.
 - You cannot approve, confirm, buy or pay, and you never say you did. Holds wait on screen for the user's tap: if they
   say "approve", "confirm" or "pay", tell them to tap Approve on the card.
 - Only things clearly outside that (the weather, news, jokes, general knowledge, small talk): say in one sentence that
@@ -81,25 +76,6 @@ PLAN_TOOL = {
     "description": "Check one plan (a trip, purchase, outing or savings goal) against the user's calendar, deadlines "
                    "and money. Returns Orbit's verdict: yes, yes_with_conditions, risky, no, or insufficient_data.",
     "input_schema": {"type": "object", "properties": {"question": {"type": "string"}}, "required": ["question"]},
-}
-
-DRAFT_EMAIL = {
-    "name": "orbit__draft_email", "server": "orbit", "tool": "draft_email", "read_only": True,
-    "description": "Draft an email from the user's Gmail. It becomes a card the user reads and approves; only their "
-                   "Approve sends it. Recipients must be addresses the user wrote in their goal.",
-    "input_schema": {"type": "object", "properties": {
-        "to": {"type": "array", "items": {"type": "string"}}, "subject": {"type": "string"}, "body": {"type": "string"}},
-        "required": ["to", "subject", "body"]},
-}
-
-DRAFT_EVENT = {
-    "name": "orbit__draft_event", "server": "orbit", "tool": "draft_event", "read_only": True,
-    "description": "Draft an event for the user's Google Calendar (India time, ISO like 2026-10-31T17:00:00). It becomes "
-                   "a card; only the user's Approve adds it. Guests get an invite, so only add ones the user named.",
-    "input_schema": {"type": "object", "properties": {
-        "title": {"type": "string"}, "start": {"type": "string"}, "end": {"type": "string"},
-        "description": {"type": "string"}, "attendees": {"type": "array", "items": {"type": "string"}}},
-        "required": ["title", "start", "end"]},
 }
 
 UNDERSTAND = """Turn the user's question into a Orbit intent (JSON). Today is {today} ({weekday}). The user lives in Bengaluru (home airport BLR).
@@ -264,8 +240,7 @@ async def run(goal, history, catalogue, call_tool, check, generate, chain):
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )
     earlier = f"EARLIER IN THIS CONVERSATION\n{_earlier(history)}\n" if history else ""
-    now = datetime.now(timezone(timedelta(hours=5, minutes=30))).strftime("%A %Y-%m-%d %H:%M")
-    contents = [types.Content(role="user", parts=[types.Part.from_text(text=f"NOW (India time): {now}\n{earlier}GOAL\n{goal}")])]
+    contents = [types.Content(role="user", parts=[types.Part.from_text(text=f"{earlier}GOAL\n{goal}")])]
     used = None
     for _ in range(MAX_STEPS):
         used, resp = await generate(contents, config, [used] if used else chain)

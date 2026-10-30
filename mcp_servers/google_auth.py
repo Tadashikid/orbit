@@ -18,9 +18,22 @@ SCOPES = [
 ]
 
 
-def creds():
-    """Valid read-only credentials, or None. Never opens a browser."""
-    if os.getenv("ORBIT_OFFLINE") or not TOKEN.exists():  # ORBIT_OFFLINE=1: force seeded data (tests, save-the-demo)
+def token_of(ctx):
+    """The user's own access token the backend sent in this request's _meta (Connect Google), or None."""
+    meta = ctx and ctx.request_context.meta  # no ctx: called directly (tests), not over MCP
+    return (meta.model_extra or {}).get("google_token") if meta else None
+
+
+def creds(token=None):
+    """Valid read-only credentials, or None. Never opens a browser. `token`: the signed-in Orbit user's own access
+    token (Connect Google, backend/google_link.py), sent by the backend with each call; else token.json, if any."""
+    if os.getenv("ORBIT_OFFLINE"):  # ORBIT_OFFLINE=1: force seeded data (tests, save-the-demo)
+        return None
+    if token:
+        from google.oauth2.credentials import Credentials
+
+        return Credentials(token)
+    if not TOKEN.exists():
         return None
     try:
         from google.auth.transport.requests import Request
