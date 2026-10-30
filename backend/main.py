@@ -2,6 +2,8 @@
 
     .venv\\Scripts\\python backend\\main.py
 
+POST /login {"email", "password"}     -> sets the demo session cookie; every endpoint below needs it (401 otherwise)
+POST /logout, GET /me                  -> sign out; who is signed in
 POST /ask {"question", "session_id"?}  -> {"verdict", "explanation", "trace", "planner", "model", "offline", "session_id"}
 POST /agent {"goal", "session_id"?}    -> server-sent events: session, tool, step, message, done (the agent loop)
 GET  /servers                          -> every server: plugged in or not, reachable, and its discovered tools
@@ -16,6 +18,8 @@ the canonical reads the money rule needs are filled in if the model skipped them
 Gemini explains. The verdict numbers only ever come from the engine.
 """
 import asyncio
+import hashlib
+import hmac
 import json
 import os
 import time
@@ -24,8 +28,8 @@ from datetime import date
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
@@ -44,6 +48,62 @@ GEMINI = agent.make_generate()  # None without GEMINI_API_KEY -> rules planner o
 
 app = FastAPI(title="Orbit")
 registry = Registry(plugged=("calendar", "gmail", "travel", "price"))  # ponytail: one shared registry = one user (demo)
+
+# Demo login: one account from .env, a signed httpOnly cookie, every other endpoint behind it. No password set = no way in.
+# ponytail: one hard-coded user, no rate limit; swap for real accounts (Google sign-in / Firebase) before sharing a link.
+DEMO_EMAIL = (os.getenv("ORBIT_DEMO_EMAIL") or "lokihateshulk@gmail.com").strip().lower()
+DEMO_PASSWORD = os.getenv("ORBIT_DEMO_PASSWORD") or ""
+COOKIE = "orbit_session"
+_KEY = hashlib.sha256(f"orbit-session:{DEMO_PASSWORD}".encode()).digest()  # a new password signs everyone out
+OPEN = {"/login", "/logout", "/me"}
+
+
+def _signed(email):
+    return f"{email}.{hmac.new(_KEY, email.encode(), 'sha256').hexdigest()}"
+
+
+def _user(request: Request):
+    value = request.cookies.get(COOKIE, "")
+    email = value.rpartition(".")[0]
+    return email if DEMO_PASSWORD and email and hmac.compare_digest(value.encode(), _signed(email).encode()) else None
+
+
+@app.middleware("http")
+async def signed_in_only(request: Request, call_next):
+    if request.url.path not in OPEN and not _user(request):
+        return JSONResponse({"detail": "Sign in first"}, status_code=401)
+    return await call_next(request)
+
+
+class Login(BaseModel):
+    email: str = Field(max_length=200)
+    password: str = Field(max_length=200)
+
+
+@app.post("/login")
+def login(body: Login, response: Response):
+    if not DEMO_PASSWORD:
+        raise HTTPException(503, "Demo login isn't set up: add ORBIT_DEMO_PASSWORD to .env")
+    email_ok = hmac.compare_digest(body.email.strip().lower().encode(), DEMO_EMAIL.encode())
+    password_ok = hmac.compare_digest(body.password.encode(), DEMO_PASSWORD.encode())
+    if not (email_ok and password_ok):
+        raise HTTPException(401, "Wrong email or password")
+    response.set_cookie(COOKIE, _signed(DEMO_EMAIL), httponly=True, samesite="strict", max_age=7 * 24 * 3600)
+    return {"email": DEMO_EMAIL}
+
+
+@app.post("/logout")
+def logout(response: Response):
+    response.delete_cookie(COOKIE)
+    return {"ok": True}
+
+
+@app.get("/me")
+def me(request: Request):
+    email = _user(request)
+    if not email:
+        raise HTTPException(401, "Sign in first")
+    return {"email": email}
 
 
 SESSION_ID = r"^[0-9a-f]{32}$"

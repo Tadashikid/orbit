@@ -8,6 +8,7 @@ on the demo date 2026-10-08 with Manu's sample statement. Re-run it whenever the
 """
 import json
 import os
+import secrets
 import socket
 import subprocess
 import sys
@@ -18,7 +19,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "frontend" / "tests" / "fixtures" / "backend.json"
 SCRATCH = Path(tempfile.mkdtemp())  # its own statement and an empty search cache: only seeded data
-os.environ.update(ORBIT_PORT_OFFSET="500", ORBIT_OFFLINE="1", ORBIT_TODAY="2026-10-08",
+os.environ.update(ORBIT_PORT_OFFSET="500", ORBIT_OFFLINE="1", ORBIT_TODAY="2026-10-08", ORBIT_DEMO_PASSWORD=secrets.token_urlsafe(16),
+                  ORBIT_DB=str(Path(tempfile.mkdtemp()) / "orbit.db"), ORBIT_AUDIT_LOG=str(Path(tempfile.mkdtemp()) / "audit.jsonl"),
                   ORBIT_STATEMENT=str(SCRATCH / "statement.csv"), ORBIT_CACHE_DIR=str(SCRATCH))
 sys.path.insert(0, str(ROOT / "backend"))
 
@@ -46,6 +48,7 @@ def main_():
         wait_for([8601, 8602, 8603, 8604, 8605])
         main.GEMINI = None  # the rules planner: deterministic
         c = TestClient(main.app)
+        c.post("/login", json={"email": main.DEMO_EMAIL, "password": main.DEMO_PASSWORD})
         ask = lambda q: c.post("/ask", json={"question": q}).json()  # noqa: E731
         r = {"GET /servers": c.get("/servers").json(), "ask_without_finance": {HERO: ask(HERO)}}
         r["POST /servers/finance/plug"] = c.post("/servers/finance/plug").json()

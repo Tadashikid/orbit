@@ -23,7 +23,9 @@ STATEMENT_BALANCE = 54263  # the last balance in data/samples/manu_statement.csv
 def client(monkeypatch):
     monkeypatch.setattr(main, "TODAY", date(2026, 10, 8))
     monkeypatch.setattr(main, "GEMINI", None)  # tests never call the real model (see test_gemini_cannot_write)
-    yield TestClient(main.app)
+    c = TestClient(main.app)
+    assert c.post("/login", json={"email": main.DEMO_EMAIL, "password": main.DEMO_PASSWORD}).status_code == 200
+    yield c
     main.registry.unplug("finance")
 
 
@@ -124,3 +126,24 @@ def test_agent_streams_events_without_a_model(client):
     assert (tool["server"], tool["tool"], tool["by"], tool["ok"]) == ("orbit", "check_plan", "rules", True)
     assert events[2]["text"] == tool["answer"]["verdict"]["headline"]
     assert tool["answer"]["trace"]  # the reads behind the plan, for the receipt
+
+
+def test_demo_login_gates_every_endpoint(monkeypatch):
+    c = TestClient(main.app)
+    assert c.get("/servers").status_code == 401  # signed out: nothing but /login, /logout, /me
+    assert c.post("/ask", json=Q).status_code == 401
+    assert c.get("/me").status_code == 401
+    assert c.post("/login", json={"email": main.DEMO_EMAIL, "password": "wrong"}).status_code == 401
+    assert c.post("/login", json={"email": "someone@else.example", "password": main.DEMO_PASSWORD}).status_code == 401
+    c.cookies.set(main.COOKIE, f"{main.DEMO_EMAIL}.forged")
+    assert c.get("/me").status_code == 401  # a cookie needs the server's signature
+    c.cookies.clear()
+
+    r = c.post("/login", json={"email": f"  {main.DEMO_EMAIL.upper()} ", "password": main.DEMO_PASSWORD})
+    assert r.json() == {"email": main.DEMO_EMAIL} and "httponly" in r.headers["set-cookie"].lower()
+    assert c.get("/me").json() == {"email": main.DEMO_EMAIL}
+    c.post("/logout")
+    assert c.get("/servers").status_code == 401
+
+    monkeypatch.setattr(main, "DEMO_PASSWORD", "")  # no password in .env: no way in, even with an old cookie
+    assert c.post("/login", json={"email": main.DEMO_EMAIL, "password": ""}).status_code == 503
