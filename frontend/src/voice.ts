@@ -81,6 +81,19 @@ export class Voice {
     ctx.createMediaStreamSource(stream).connect(node);
     this.mic = { ctx, stream };
   }
+  // A request the wake word already heard ("Hey Orbit, can I buy a table?"): Live takes it as if spoken.
+  async say(text: string) {
+    await this.open();
+    this.hush();
+    this.send({ type: "text", text });
+  }
+  get listening() {
+    return Boolean(this.mic);
+  }
+  // Seconds of Orbit's reply still queued to play (wake listening resumes after it, so Orbit can't wake itself).
+  get playbackLeft() {
+    return this.out ? Math.max(0, this.next - this.out.currentTime) : 0;
+  }
   stop() {
     if (!this.mic) return;
     this.stopMic();

@@ -30,6 +30,7 @@ import { Skeleton, Button, Chip, Modal, AnimatedAmount } from "./components/ui";
 import { api } from "./api";
 import { useDecision } from "./hooks/useDecision";
 import { Voice, voiceSummary, type VoiceEvent } from "./voice";
+import { WakeWord, wakeSupported } from "./wake";
 import type { Approval, Server, StatementInfo } from "./types";
 export const HERO = "Can I afford a Goa trip next weekend?";
 const prompts = [
@@ -203,48 +204,125 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
   const [caption, setCaption] = useState("");
   const [voiceError, setVoiceError] = useState("");
   const heard = useRef("");
+  const replied = useRef(false); // Orbit has started answering this turn
+  const handsFree = useRef(false); // this turn began with "Hey Orbit": the mic closes by itself
+  const quiet = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const onVoice = useRef<(e: VoiceEvent) => void>(() => undefined);
+  const getVoice = () => (voiceRef.current ??= new Voice((e) => onVoice.current(e)));
+  // "Hey Orbit" (src/wake.ts): an opt-in switch. Listening pauses during a turn and resumes after Orbit has spoken.
+  const [wakeOn, setWakeOn] = useState(false);
+  const wakeOnRef = useRef(false);
+  const wakeRef = useRef<WakeWord | null>(null);
+  const onWake = useRef<(rest: string) => void>(() => undefined);
+  const listenForWake = () => {
+    if (!wakeOnRef.current) return;
+    (wakeRef.current ??= new WakeWord((rest) => onWake.current(rest), (msg) => {
+      setVoiceError(msg);
+      wakeOnRef.current = false;
+      setWakeOn(false);
+    })).start();
+  };
+  const closeMic = () => {
+    clearTimeout(quiet.current);
+    if (voiceRef.current?.listening) voiceRef.current.stop();
+  };
+  const startTalking = async (hands: boolean) => {
+    setVoiceError("");
+    heard.current = "";
+    replied.current = false;
+    handsFree.current = hands;
+    setCaption("");
+    wakeRef.current?.stop();
+    const v = getVoice();
+    try {
+      await v.start();
+      setVoice("listening");
+      if (hands) // nothing said after "Hey Orbit": back to waiting for it
+        quiet.current = setTimeout(() => {
+          if (!heard.current) {
+            closeMic();
+            setVoice("ready");
+            listenForWake();
+          }
+        }, 8000);
+    } catch (err) {
+      setVoiceError((err as Error).message || "Orbit can't use the microphone.");
+      setVoice(v.connected ? "ready" : "off");
+      listenForWake();
+    }
+  };
+  onWake.current = (rest) => {
+    if (rest.split(/\s+/).length >= 2) {
+      // "Hey Orbit, can I buy a table?" in one breath: Live takes the request as text
+      setVoiceError("");
+      setQuestion(rest);
+      setCaption("");
+      replied.current = false;
+      setVoice("thinking");
+      getVoice().say(rest).catch((err: Error) => {
+        setVoiceError(err.message);
+        listenForWake();
+      });
+    } else {
+      void startTalking(true);
+    }
+  };
   onVoice.current = (e) => {
     if (e.type === "heard") {
+      clearTimeout(quiet.current);
       heard.current += e.text;
       setQuestion(heard.current.trim());
     } else if (e.type === "ask") {
+      if (handsFree.current) closeMic();
       setVoice("thinking");
       setCaption("");
       void Promise.resolve(ask(e.request)).then((r) => voiceRef.current?.result(e.id, voiceSummary(r ?? null)));
     } else if (e.type === "said") {
+      if (handsFree.current) closeMic();
+      replied.current = true;
       setVoice("speaking");
       setCaption((c) => c + e.text);
     } else if (e.type === "turn_done") {
       setVoice((v) => (v === "listening" ? v : "ready"));
+      if (replied.current) {
+        replied.current = false;
+        // after Orbit's voice has finished playing, so it can't wake itself
+        setTimeout(listenForWake, ((voiceRef.current?.playbackLeft ?? 0) + 0.6) * 1000);
+      }
     } else if (e.type === "interrupted") {
       voiceRef.current?.hush();
     } else if (e.type === "error") {
       setVoiceError(e.text);
     } else if (e.type === "closed") {
       setVoice("off");
+      listenForWake();
     }
   };
-  useEffect(() => () => voiceRef.current?.close(), []);
+  useEffect(
+    () => () => {
+      wakeRef.current?.stop();
+      voiceRef.current?.close();
+    },
+    [],
+  );
   const toggleMic = async () => {
-    setVoiceError("");
-    const v = (voiceRef.current ??= new Voice((e) => onVoice.current(e)));
     if (voice === "listening") {
-      v.stop();
+      closeMic();
       setVoice("thinking");
       return;
     }
-    try {
-      heard.current = "";
-      setCaption("");
-      await v.start();
-      setVoice("listening");
-    } catch (err) {
-      setVoiceError((err as Error).message || "Orbit can't use the microphone.");
-      setVoice(v.connected ? "ready" : "off");
-    }
+    await startTalking(false);
+  };
+  const toggleWake = () => {
+    const on = !wakeOn;
+    wakeOnRef.current = on;
+    setWakeOn(on);
+    setVoiceError("");
+    if (on) listenForWake();
+    else wakeRef.current?.stop();
   };
   const endVoice = () => {
+    closeMic();
     voiceRef.current?.close();
     setVoice("off");
     setCaption("");
@@ -478,6 +556,21 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
             <p className="field-error" role="alert">
               {voiceError}
             </p>
+          )}
+          {wakeSupported() && (
+            <button
+              type="button"
+              className={`wake-switch${wakeOn ? " wake-on" : ""}`}
+              role="switch"
+              aria-checked={wakeOn}
+              onClick={toggleWake}
+              title="Listens for “Hey Orbit” while this tab is open. Chrome / Edge transcribe that audio."
+            >
+              <span className="wake-track" aria-hidden>
+                <span className="wake-knob" />
+              </span>
+              “Hey Orbit” {wakeOn ? "on: say it any time" : "off"}
+            </button>
           )}
           <motion.div
             className="calm-suggestions"

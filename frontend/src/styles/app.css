@@ -2755,3 +2755,45 @@
     opacity: 0.35;
   }
 }
+/* "Hey Orbit" switch (App.tsx + wake.ts) */
+.wake-switch {
+  margin: 12px auto 0;
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--on-paper-primary);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+.wake-switch:focus-visible {
+  outline: 3px solid var(--forest-600);
+  outline-offset: 2px;
+}
+.wake-track {
+  width: 40px;
+  height: 22px;
+  padding: 2px;
+  border-radius: 999px;
+  border: 1px solid var(--forest-800);
+  background: var(--paper);
+  display: inline-flex;
+}
+.wake-knob {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--forest-800);
+  transition: transform 0.2s;
+}
+.wake-on .wake-track {
+  background: var(--forest-800);
+}
+.wake-on .wake-knob {
+  background: var(--on-forest-primary);
+  transform: translateX(18px);
+}

@@ -128,6 +128,12 @@ try {
   const spoken = voiceSummary(booked);
   assert(spoken.startsWith(booked.wire.headline) && spoken.includes("1 option is on hold") && spoken.includes("taps Approve"));
   assert.match(voiceSummary(null), /couldn't check/);
+  // "Hey Orbit": the phrase alone opens the mic; a request in the same breath is kept; "orbit" alone never wakes it.
+  const { afterWake } = await server.ssrLoadModule("/src/wake.ts");
+  assert.equal(afterWake("hey orbit"), "");
+  assert.equal(afterWake("Okay Orbit, can I buy a table?"), "can I buy a table?");
+  assert.equal(afterWake("heyorbit book a goa trip"), "book a goa trip");
+  assert.equal(afterWake("the orbit of the moon"), null);
   // Never shows a malformed answer, never pretends when the backend is down.
   assert.throws(() => toResult({ verdict: { verdict: "maybe" } }, on), ApiError);
   globalThis.fetch = async () => {
