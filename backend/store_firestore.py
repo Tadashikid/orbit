@@ -90,3 +90,7 @@ def secret(owner, name):
 
 def forget_secret(owner, name):
     _user(owner).collection("secrets").document(name).delete()
+
+
+def forget_action(owner, action_id):
+    _user(owner).collection("actions").document(action_id).delete()

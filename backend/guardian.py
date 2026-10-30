@@ -35,7 +35,7 @@ POLICY = {
     "booking__hold_flight": "prepare", "booking__hold_stay": "prepare", "booking__hold_order": "prepare",
     "booking__release_hold": "prepare",
     # commit: confirming / paying. Never from the model: only Orbit's approval endpoint, after you approve on screen.
-    "booking__confirm_hold": "commit",
+    "booking__confirm_hold": "commit", "booking__cancel_booking": "commit",
 }
 MAX_CALLS = 24  # per question; a trip needs ~8
 MAX_OUTBOUND = 8  # per question; a trip needs 3

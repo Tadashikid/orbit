@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BedDouble, Check, Plane, ShieldCheck, ShoppingCart, X } from "lucide-react";
+import { BedDouble, Check, Plane, ShieldCheck, ShoppingCart, Trash2, X } from "lucide-react";
 import { api } from "../api";
 import type { Approval } from "../types";
 import { Button, money } from "./ui";
@@ -26,8 +26,12 @@ export default function Approvals({
 }) {
   const [busy, setBusy] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
-  if (!items.length) return null;
-  const act = async (a: Approval, how: "approve" | "decline") => {
+  const shown = items.filter((a) => a.status !== "cancelled"); // deleted cards are gone
+  if (!shown.length) return null;
+  const act = async (a: Approval, how: "approve" | "decline" | "remove") => {
+    if (how === "remove" && a.status === "confirmed" &&
+        !confirm(`Cancel ${a.summary}? It's cancelled with the provider and taken off your calendar. No emails are sent.`))
+      return;
     setBusy(a.id);
     setErrors((e) => ({ ...e, [a.id]: "" }));
     try {
@@ -47,7 +51,7 @@ export default function Approvals({
         test” are real Duffel holds paid from a test balance; the rest is a sandbox. No real money moves.
       </p>
       <ul>
-        {items.map((a) => {
+        {shown.map((a) => {
           const Icon = KIND[a.kind] ?? ShoppingCart;
           return (
             <li key={a.id} className={`approval approval-${a.status}`}>
@@ -85,6 +89,13 @@ export default function Approvals({
                     Decline
                   </Button>
                 </div>
+              )}
+              {["confirmed", "declined", "expired", "failed"].includes(a.status) && (
+                <button className="discreet-button approval-delete" disabled={busy === a.id}
+                  aria-label={a.status === "confirmed" ? `Cancel booking: ${a.summary}` : `Clear ${a.summary}`}
+                  title={a.status === "confirmed" ? "Cancel booking" : "Clear"} onClick={() => act(a, "remove")}>
+                  <Trash2 size={18} />
+                </button>
               )}
             </li>
           );

@@ -13,6 +13,11 @@ function doPost(e) {
     var b = JSON.parse(e.postData.contents);
     var secret = PropertiesService.getScriptProperties().getProperty("ORBIT_SECRET");
     if (!secret || b.secret !== secret) return reply({ ok: false, error: "wrong secret" });
+    if (b.cancel_event) {  // a cancelled booking: remove its event, no email to anyone
+      var old = CalendarApp.getEventById(b.cancel_event);
+      if (old) old.deleteEvent();
+      return reply({ ok: true });
+    }
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(b.to || "")) return reply({ ok: false, error: "not an email address" });
     var event = null;
     if (!b.event) {

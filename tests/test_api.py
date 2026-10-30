@@ -405,3 +405,34 @@ def test_duffel_flight_times_make_the_calendar_event():
     assert (ev["start"], ev["end"]) == ("2026-11-14T06:05:00+05:30", "2026-11-14T07:20:00+05:30")
     assert ev["title"] == "✈ BLR → GOI · British Airways BA123"
     assert notify.event({"kind": "order", "summary": "iPhone", "details": {}}) is None  # a purchase is just the email
+
+
+def test_delete_cancels_a_booking_quietly_and_clears_the_card(client, monkeypatch):
+    """Delete: the booking is cancelled, its calendar event removed with no email, and the card is gone."""
+    import httpx
+
+    import notify
+
+    posts = []
+
+    def apps_script(request):
+        posts.append(json.loads(request.content))
+        return httpx.Response(200, json={"ok": True, "event": "evt_123"})
+
+    real = httpx.AsyncClient
+    monkeypatch.setattr(notify, "_client", lambda **k: real(transport=httpx.MockTransport(apps_script), **k))
+    monkeypatch.setattr(notify, "URL", "https://script.google.com/macros/s/x/exec")
+    monkeypatch.setattr(notify, "SECRET", "s3cret")
+    client.post("/servers/finance/plug")
+    out, back, stay = [e["action"] for e in _events(client, "Book a Goa trip next weekend") if e["type"] == "approval"]
+    assert client.post(f"/actions/{back['id']}/delete").status_code == 409  # not booked yet: Decline it
+    client.post(f"/actions/{out['id']}/approve", json={"hash": out["hash"]})
+
+    gone = client.post(f"/actions/{out['id']}/delete").json()
+    assert gone["status"] == "cancelled" and "nothing to refund" in gone["outcome"]["refund"]
+    assert posts[-1] == {"secret": "s3cret", "cancel_event": "evt_123"}  # the event goes, and no email is asked for
+    assert out["id"] not in {a["id"] for a in client.get("/actions").json()["actions"]}
+    assert client.post(f"/actions/{out['id']}/delete").status_code == 404  # never twice
+    client.post(f"/actions/{back['id']}/decline")
+    assert client.post(f"/actions/{back['id']}/delete").json()["outcome"]["refund"] is None  # a declined card just clears
+    assert len(posts) == 2  # one confirmation, one quiet removal: nothing for the decline or the clear

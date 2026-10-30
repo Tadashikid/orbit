@@ -2623,6 +2623,9 @@
   display: flex;
   gap: 8px;
 }
+.approval-delete {
+  align-self: flex-start;
+}
 .google-note {
   display: flex;
   gap: 8px;
