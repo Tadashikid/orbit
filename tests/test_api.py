@@ -122,4 +122,5 @@ def test_agent_streams_events_without_a_model(client):
     assert [e["type"] for e in events] == ["session", "tool", "message", "done"]
     tool = events[1]
     assert (tool["server"], tool["tool"], tool["by"], tool["ok"]) == ("orbit", "check_plan", "rules", True)
-    assert events[2]["text"] == tool["result"]["verdict"]["headline"]
+    assert events[2]["text"] == tool["answer"]["verdict"]["headline"]
+    assert tool["answer"]["trace"]  # the reads behind the plan, for the receipt

@@ -114,7 +114,7 @@ def test_agent_loop_chains_plans_and_guardian_still_decides():
 
     async def call_tool(name, args):
         verdict = "yes" if "Goa" in args["question"] else "no"
-        return {"server": "orbit", "tool": "check_plan", "args": args, "ok": True, "ms": 1, "result": {"verdict": {"verdict": verdict}}}
+        return {"server": "orbit", "tool": "check_plan", "args": args, "ok": True, "ms": 1, "result": {"verdict": {"verdict": verdict}}, "answer": {"verdict": {"verdict": verdict}, "trace": []}}
 
     async def collect():
         guard = guardian.Guard(tools, "Goa or Kerala?")
@@ -124,6 +124,6 @@ def test_agent_loop_chains_plans_and_guardian_still_decides():
     events = asyncio.run(collect())
     assert [(e["type"], e.get("tool"), e.get("guardian")) for e in events] == [
         ("tool", "check_plan", "allowed"), ("tool", "check_plan", "allowed"), ("tool", "load_statement", "needs_approval"), ("message", None, None)]
-    assert [e["result"]["verdict"]["verdict"] for e in events[:2]] == ["yes", "no"]
+    assert [e["answer"]["verdict"]["verdict"] for e in events[:2]] == ["yes", "no"]
     assert events[-1]["text"] == "Goa fits, Kerala doesn't."
     assert "Can I afford Goa?" in seen[0]  # the earlier turn reached the model

@@ -202,7 +202,7 @@ async def _agent_events(goal, history):
             r = {"server": "orbit", "tool": "check_plan", "args": args, "ts": agent._now()}
             try:
                 out = await run_question(args.get("question", ""), history, explain=False)
-                r.update(ok=True, result={"verdict": out["verdict"], "intent": out["intent"]})
+                r.update(ok=True, result={"verdict": out["verdict"], "intent": out["intent"]}, answer=out)
             except Exception as e:
                 r.update(ok=False, error=f"{type(e).__name__}: {e}"[:200])
             r["ms"] = round((time.perf_counter() - start) * 1000)
@@ -219,8 +219,10 @@ async def _agent_events(goal, history):
                 trace += [ev] if ev["type"] == "tool" else []
                 yield ev
         except Exception as e:
-            if started:
-                yield {"type": "message", "text": "The model stopped answering partway through. Try again.", "model": None}
+            if started:  # a plan already checked still stands on its own; otherwise say why we stopped
+                plans = [t["answer"]["verdict"]["headline"] for t in trace if t.get("answer")]
+                yield {"type": "message", "model": None, "text": plans[-1] if plans else
+                       f"The model stopped answering partway through ({str(e)[:120]}). Try again."}
             else:
                 yield {"type": "step", "text": f"Model unavailable ({str(e)[:120]}): checking it as one plan."}
     if not started:  # no model: the goal is checked as a single plan by the rules planner
@@ -229,7 +231,7 @@ async def _agent_events(goal, history):
             yield {"type": "message", "text": f"Blocked by Orbit Guardian: {why}", "model": None}
         else:
             r = await call(agent.PLAN_TOOL["name"], {"question": goal})
-            row = agent.entry(r, "rules") | ({"result": r["result"]} if r["ok"] else {})
+            row = agent.entry(r, "rules") | ({"answer": r["answer"]} if r["ok"] else {})
             trace.append(row)
             yield {"type": "tool", **row}
             yield {"type": "message", "text": r["result"]["verdict"]["headline"] if r["ok"] else r["error"], "model": None}
