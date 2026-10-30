@@ -30,6 +30,7 @@ const Panels = lazy(() => import("./screens/Panels"));
 import { ConnectDialog, SetupDialog } from "./screens/Dialogs";
 import { Skeleton, Button, Chip, Modal, AnimatedAmount } from "./components/ui";
 import { api, type GoogleStatus } from "./api";
+import { invalidInput } from "./input";
 import { useDecision } from "./hooks/useDecision";
 import { Voice, voiceSummary, type VoiceEvent } from "./voice";
 import { WakeWord, wakeSupported } from "./wake";
@@ -219,11 +220,16 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
   const waiting = bookings.filter((b) => b.status === "pending").length;
   const ORDER = ["pending", "confirmed", "approving", "declined", "expired", "failed"];
   const sortedBookings = [...bookings].sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status));
+  const [invalid, setInvalid] = useState(""); // junk input: a popup instead of a model call
   const ask = (q = question, quick = false) => {
     if (busy) return;
     const text = q.trim();
     if (!text) {
       setAskError("Type a question or choose one below.");
+      return;
+    }
+    if (invalidInput(text)) {
+      setInvalid(text);
       return;
     }
     setAskError("");
@@ -858,6 +864,17 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
             void loadStatement(true);
           }}
         />
+      )}
+      {invalid && (
+        <Modal title="INVALID INPUT." label="invalid_input" onClose={() => setInvalid("")}>
+          <p>
+            “{invalid.length > 60 ? `${invalid.slice(0, 60)}…` : invalid}” doesn't look like a question. Please provide a
+            proper input, like “Can I afford a Goa trip next weekend?” or “What's on my calendar this week?”
+          </p>
+          <Button tone="forest" onClick={() => setInvalid("")}>
+            OK
+          </Button>
+        </Modal>
       )}
       {bookingsOpen && (
         <Modal title="READY WHEN YOU ARE." label="your_bookings" onClose={closeBookings}>

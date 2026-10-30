@@ -10,6 +10,13 @@ const server = await createServer({
 });
 try {
   const { api, toResult, ApiError } = await server.ssrLoadModule("/src/api.ts");
+  // Junk input is stopped before any model call; real questions, in any language, never are.
+  const { invalidInput } = await server.ssrLoadModule("/src/input.ts");
+  for (const junk of ["asdfgh", "qwertyuiop", "123456", "!!!!!", "aaaaaaa", "hjkl zxcvb", "?", "dfghjkl trip"])
+    assert.equal(invalidInput(junk), true, junk);
+  for (const ok of [HERO, "Can I buy a table?", "what's the weather?", "Book it", "hi there", "Rs 5000 iPhone 16?",
+    "BLR to GOI on Friday", "mere calendar mein kya hai", "मेरा कैलेंडर दिखाओ", "rhythm class this week"])
+    assert.equal(invalidInput(ok), false, ok);
   // The demo login: signed out, a wrong password is refused, then /me knows who signed in, until logout.
   const signedOut = fakeBackend({ signedIn: false });
   globalThis.fetch = signedOut.fetch;
