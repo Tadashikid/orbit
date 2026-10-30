@@ -23,7 +23,7 @@ from mcp.client.streamable_http import streamable_http_client
 # ORBIT_PORT_OFFSET: the tests run their own servers on other ports, so they never touch your running ones.
 _OFFSET = int(os.getenv("ORBIT_PORT_OFFSET", "0"))
 SERVERS = {name: f"http://127.0.0.1:{port + _OFFSET}/mcp"
-           for name, port in (("calendar", 8101), ("gmail", 8102), ("finance", 8103), ("travel", 8104), ("price", 8105))}
+           for name, port in (("calendar", 8101), ("gmail", 8102), ("finance", 8103), ("travel", 8104), ("price", 8105), ("booking", 8106))}
 TIMEOUT_S = 10  # a cold live Gmail fetch takes ~3 s
 IST = timezone(timedelta(hours=5, minutes=30))
 
@@ -63,6 +63,7 @@ class Registry:
                 "description": t.description or "",
                 "input_schema": t.inputSchema,
                 "read_only": bool(t.annotations and t.annotations.readOnlyHint),  # Guardian gates the rest
+                "destructive": bool(t.annotations and t.annotations.destructiveHint),
             }
             for t in tools
         ]

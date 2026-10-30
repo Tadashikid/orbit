@@ -127,3 +127,24 @@ def test_agent_loop_chains_plans_and_guardian_still_decides():
     assert [e["answer"]["verdict"]["verdict"] for e in events[:2]] == ["yes", "no"]
     assert events[-1]["text"] == "Goa fits, Kerala doesn't."
     assert "Can I afford Goa?" in seen[0]  # the earlier turn reached the model
+
+
+def test_holds_need_a_cleared_plan_and_confirming_never_runs_from_the_model():
+    tools = [_tool("orbit__check_plan"), _tool("booking__hold_flight", read_only=False),
+             _tool("booking__confirm_hold", read_only=False)]
+    guard = guardian.Guard(tools, "Book Goa next weekend")
+    fare = {"origin": "BLR", "dest": "GOI", "date": "2026-11-07", "airline": "IndiGo", "depart": "21:00", "price": 6411}
+    assert guard.check("booking__hold_flight", fare)[0] == "blocked"  # no plan checked yet
+    guard.saw({"server": "orbit", "tool": "check_plan", "ok": True,  # a "yes" with money unchecked doesn't clear
+               "result": {"verdict": {"verdict": "yes", "numbers": {"balance": None}}}})
+    assert guard.check("booking__hold_flight", fare)[0] == "blocked"
+    guard.saw({"server": "orbit", "tool": "check_plan", "ok": True,
+               "result": {"verdict": {"verdict": "yes_with_conditions", "numbers": {"balance": 54263, "trip_cost": {"low": 6411}}}}})
+    assert guard.check("booking__hold_flight", fare) == ("allowed", "")  # 6411 is the fare itself, not a leak
+    assert guard.check("booking__hold_flight", {**fare, "airline": "IndiGo 54263"})[0] == "blocked"  # private text out
+    assert guard.check("booking__confirm_hold", {"hold_id": "h_1"}) == ("needs_approval", guardian.COMMIT)
+    asked = [guard.check("booking__hold_flight", fare)[0] for _ in range(guardian.MAX_HOLDS)]
+    assert asked[-1] == "blocked"  # the hold limit
+    flipped = guardian.Guard([_tool("orbit__check_plan"), {**_tool("booking__hold_flight", read_only=False), "destructive": True}])
+    flipped.cleared = True
+    assert flipped.check("booking__hold_flight", fare)[0] == "needs_approval"  # the server made it stricter: stricter wins

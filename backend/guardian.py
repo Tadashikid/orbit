@@ -8,6 +8,8 @@
 - Outbound tools (they send their arguments to a third party) can't carry private data: numbers and emails
   read from your private sources are blocked from their arguments, unless you typed them in the question.
 - Each question has a call budget, so a looping model can't burn SerpAPI credits.
+- Holds (prepare) only after the engine cleared a plan in the same request; confirming or paying (commit) never
+  runs from the model: only the approval endpoint does that, after the user approves on screen.
 - Every decision is appended to an audit log on this machine.
 """
 import json
@@ -29,12 +31,20 @@ POLICY = {
     "finance__load_statement": "write",
     "travel__search_flights": "outbound", "travel__search_hotels": "outbound",
     "price__check_price": "outbound",
+    # prepare: reversible holds (no money moves). Only after the engine cleared a plan in this same goal.
+    "booking__hold_flight": "prepare", "booking__hold_stay": "prepare", "booking__hold_order": "prepare",
+    "booking__release_hold": "prepare",
+    # commit: confirming / paying. Never from the model: only Orbit's approval endpoint, after you approve on screen.
+    "booking__confirm_hold": "commit",
 }
 MAX_CALLS = 24  # per question; a trip needs ~8
 MAX_OUTBOUND = 8  # per question; a trip needs 3
+MAX_HOLDS = 4  # per goal: a flight out, a flight back, a stay, one spare
+CLEARS = {"yes", "yes_with_conditions", "risky"}  # engine verdicts that let the agent put a plan on hold
 AUDIT_LOG = Path(os.getenv("ORBIT_AUDIT_LOG") or Path(__file__).resolve().parents[1] / "data" / "session" / "audit.jsonl")
 EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 WRITE = "write tool: only you can approve this, not the AI"
+COMMIT = "confirming or paying: only you can approve this, on screen in Orbit"
 
 
 class Guard:
@@ -44,7 +54,8 @@ class Guard:
         self.tools = {t["name"]: t for t in catalogue}
         self.typed = question.replace(",", "")  # what the user said themselves is theirs to send
         self.secrets = set()
-        self.calls = self.outbound = 0
+        self.calls = self.outbound = self.holds = 0
+        self.cleared = False  # set once the engine says yes / yes_with_conditions / risky to a plan in this goal
 
     def check(self, name, args=None):
         """("allowed" | "blocked" | "needs_approval", reason). An allowed answer counts against the budget."""
@@ -53,21 +64,35 @@ class Guard:
             return "blocked", "not a tool from a plugged-in server"
         if kind is None:
             return "blocked", "not on Orbit's reviewed tool list"
-        if kind == "write" or not tool["read_only"]:
+        if kind == "commit":
+            return "needs_approval", COMMIT
+        if kind == "write" or tool.get("destructive") or (kind != "prepare" and not tool["read_only"]):
             return "needs_approval", WRITE
         if self.calls >= MAX_CALLS:
             return "blocked", f"call budget used up ({MAX_CALLS} per question)"
+        if kind == "prepare":
+            if not self.cleared:
+                return "blocked", "check the plan with your budget first: Orbit only holds what its engine says fits"
+            if self.holds >= MAX_HOLDS:
+                return "blocked", f"hold limit reached ({MAX_HOLDS} per request)"
+            # Names, not prices: a fare's price came from the plan itself, but free text must not carry your data.
+            if self._leaks({k: v for k, v in (args or {}).items() if isinstance(v, str)}):
+                return "blocked", "would send your private data to a third party"
+            self.holds += 1
         if kind in ("outbound", "plan"):
             if self.outbound >= MAX_OUTBOUND:
                 return "blocked", f"outside-search budget used up ({MAX_OUTBOUND} per question)"
             # ponytail: literal match only; a model spelling digits out ("five four...") gets past. Fine while the
             # only outbound tools are searches; add an allowlist of arg shapes once a tool can send free text.
-            sent = json.dumps(args or {}).replace(",", "")
-            if any(re.search(rf"(?<![\w.-]){re.escape(s)}(?![\w.-])", sent) for s in self.secrets):
+            if self._leaks(args):
                 return "blocked", "would send your private data to a third party"
             self.outbound += 1
         self.calls += 1
         return "allowed", ""
+
+    def _leaks(self, args):
+        sent = json.dumps(args or {}).replace(",", "")
+        return any(re.search(rf"(?<![\w.-]){re.escape(s)}(?![\w.-])", sent) for s in self.secrets)
 
     def saw(self, result):
         """Remember the numbers (>= 1000) and emails a private read returned."""
@@ -89,6 +114,10 @@ class Guard:
 
         walk(result.get("result"))
         self.secrets |= {s for s in found if s not in self.typed}
+        verdict = (result.get("result") or {}).get("verdict")
+        # A "yes" with Finance off only means the calendar is free: holds need the money checked too.
+        if isinstance(verdict, dict) and verdict.get("verdict") in CLEARS and (verdict.get("numbers") or {}).get("balance") is not None:
+            self.cleared = True
 
 
 def check(name, catalogue, args=None):
