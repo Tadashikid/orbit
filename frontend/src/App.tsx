@@ -32,6 +32,7 @@ import { ConnectDialog, SetupDialog } from "./screens/Dialogs";
 import { Skeleton, Button, Chip, Modal, AnimatedAmount } from "./components/ui";
 import { api, type GoogleStatus, type ProfileStatus } from "./api";
 import ProfileForm from "./components/ProfileForm";
+import DeleteMe from "./components/DeleteMe";
 import { invalidInput } from "./input";
 import { useDecision } from "./hooks/useDecision";
 import { Voice, voiceSummary, type VoiceEvent } from "./voice";
@@ -145,17 +146,7 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
       if (s.ready && !s.profile && !asked) setProfileOpen(true);
     }, () => undefined);
   }, []);
-  const deleteMe = async () => {
-    if (!confirm("Delete your Orbit account and everything it keeps? Your conversations, booking cards, bank statement " +
-        "and Google connection go, and you're signed out. Bookings already confirmed stay with the airline or hotel. " +
-        "This can't be undone.")) return;
-    try {
-      await api.deleteMe();
-      onSignOut?.();
-    } catch (e) {
-      alert(`Couldn't delete your data: ${(e as Error).message}`);
-    }
-  };
+  const [deleting, setDeleting] = useState(false); // the Delete my data popup (hold to confirm)
   const toggleGoogle = async () => {
     if (!google?.connected) return void location.assign("/api/google/connect");
     if (!confirm(`Disconnect ${google.email}? Orbit goes back to the sample calendar and inbox.`)) return;
@@ -512,7 +503,7 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
             </button>
           )}
           {onSignOut && (
-            <button className="discreet-button" aria-label="Delete my data" title="Delete my data" onClick={deleteMe}>
+            <button className="discreet-button" aria-label="Delete my data" title="Delete my data" onClick={() => setDeleting(true)}>
               <UserX size={20} />
             </button>
           )}
@@ -900,6 +891,7 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
           </Button>
         </Modal>
       )}
+      {deleting && <DeleteMe onClose={() => setDeleting(false)} onDeleted={() => onSignOut?.()} />}
       {profileOpen && me && (
         <Modal title="YOUR DETAILS." label="your_profile" onClose={() => setProfileOpen(false)}>
           <ProfileForm

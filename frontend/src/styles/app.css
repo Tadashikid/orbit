@@ -2892,3 +2892,62 @@ button.approval-store {
   font-weight: 700;
   cursor: pointer;
 }
+/* Delete my data: loud on purpose, and the button has to be held down */
+.modal:has(.delete-me) {
+  border: 3px solid #b3261e;
+}
+.modal:has(.delete-me) h2 {
+  color: #b3261e;
+}
+.delete-warning {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #fbe3e1;
+  color: #8c1d18;
+  font-size: 18px;
+}
+.delete-hold {
+  position: relative;
+  overflow: hidden;
+  min-width: 190px;
+  padding: 14px 22px;
+  border: 2px solid #b3261e;
+  border-radius: 999px;
+  background: #fff5f4;
+  color: #8c1d18;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.delete-hold:focus-visible {
+  outline: 3px solid #b3261e;
+  outline-offset: 3px;
+}
+.delete-hold:disabled {
+  cursor: progress;
+}
+.delete-hold-fill {
+  position: absolute;
+  inset: 0;
+  width: 0;
+  background: #b3261e;
+}
+.delete-hold.holding .delete-hold-fill,
+.delete-hold:disabled .delete-hold-fill {
+  width: 100%;
+  transition: width var(--hold) linear;
+}
+.delete-hold-label {
+  position: relative;
+}
+.delete-hold.holding,
+.delete-hold:disabled {
+  color: #fff;
+}
