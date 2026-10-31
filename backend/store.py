@@ -95,7 +95,7 @@ def _action(row):
     # Shopping and hotels: the store's checkout (stores have no ordering API, so you pay there yourself).
     link = d.get("checkout") or d.get("link") or ""
     shop = {"store": d.get("store"), "link": link} if h["kind"] in ("order", "stay") and link.startswith("https://") else {}
-    shop |= {"passenger": d["passenger"]} if d.get("passenger") else {}
+    shop |= {"booked_for": d["booked_for"]} if d.get("booked_for") else {}
     return {"id": action_id, "session": session, "hold_id": h["hold_id"], "kind": h["kind"], "summary": h["summary"],
             "amount": h["amount"], "currency": h.get("currency", "INR"), "expires_at": h["expires_at"], "hash": digest,
             "status": status, **shop,

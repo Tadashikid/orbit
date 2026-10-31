@@ -236,7 +236,7 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
     d.updateApproval(a);
   };
   const waiting = bookings.filter((b) => b.status === "pending").length;
-  const ORDER = ["pending", "confirmed", "approving", "declined", "expired", "failed"];
+  const ORDER = ["pending", "confirmed", "checkout", "approving", "declined", "expired", "failed"];
   const sortedBookings = [...bookings].sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status));
   const [invalid, setInvalid] = useState(""); // junk input: a popup instead of a model call
   const ask = (q = question, quick = false) => {

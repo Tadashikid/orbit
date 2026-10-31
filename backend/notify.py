@@ -39,7 +39,8 @@ def event(booking):
 def message(booking, outcome):
     """(subject, body): the email for an order, the event's description for a flight or stay."""
     lines = [f"Booked: {booking['summary']}", f"Amount: {booking.get('currency', 'INR')} {booking['amount']:,}",
-             f"Reference: {outcome.get('reference') or '-'}", outcome.get("payment") or "",
+             f"Reference: {outcome.get('reference') or '-'}", (booking.get("details") or {}).get("booked_for") or "",
+             outcome.get("payment") or "",
              "", "You approved this in Orbit. Test mode: no real money moved."]
     return f"Booked: {booking['summary']}", "\n".join(lines)
 

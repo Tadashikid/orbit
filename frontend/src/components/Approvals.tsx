@@ -33,22 +33,25 @@ export default function Approvals({
 }) {
   const [busy, setBusy] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
-  if (!items.length) return null;
   const [copied, setCopied] = useState("");
+  if (!items.length) return null;
   const copy = async (a: Approval) => {
+    if (!profile) return;
     try {
-      await navigator.clipboard.writeText(forCheckout(profile!));
+      await navigator.clipboard.writeText(forCheckout(profile));
       setCopied(a.id);
     } catch {
       setErrors((e) => ({ ...e, [a.id]: "Couldn't copy: select the details and copy them yourself." }));
     }
   };
-  // Shops and hotels: open their checkout (in the click, so it isn't blocked as a pop-up), then mark it approved.
+  // Shops and hotels: open their checkout (in the click, so it isn't blocked as a pop-up) with your details on the
+  // clipboard to paste. Orbit books nothing and emails nothing: you pay there and the store confirms it.
   const checkout = (a: Approval) => {
     window.open(a.link, "_blank", "noopener,noreferrer");
-    void act(a, "approve");
+    void copy(a);
+    void act(a, "checkout");
   };
-  const act = async (a: Approval, how: "approve" | "decline") => {
+  const act = async (a: Approval, how: "approve" | "decline" | "checkout") => {
     setBusy(a.id);
     setErrors((e) => ({ ...e, [a.id]: "" }));
     try {
@@ -64,8 +67,8 @@ export default function Approvals({
       {!inWindow && <h2>Waiting for your OK</h2>}
       <p className="approvals-note">
         <ShieldCheck size={16} />
-        Orbit put these on hold. Nothing is booked or paid until you approve. Shop and hotel cards open the store's
-        checkout with your details ready: you review and pay there. Test mode: flights marked “Duffel
+        Orbit put these on hold in your name. Nothing is booked or paid until you approve. Shop and hotel cards:
+        Checkout opens the store with your details copied, and you review and pay there. Test mode: flights marked “Duffel
         test” are real Duffel holds paid from a test balance; the rest is a sandbox. No real money moves.
       </p>
       <ul>
@@ -80,17 +83,17 @@ export default function Approvals({
                   {price(a)}
                   {a.status === "pending" && ` · held until ${until(a.expires_at)}`}
                 </span>
-                {a.passenger && <span>Passenger: {a.passenger}</span>}
-                {a.status === "pending" && a.link && (profile ? (
-                  <span className="approval-details">
-                    <span>For checkout: {forCheckout(profile).replaceAll("\n", " · ")}</span>
-                    <button type="button" className="approval-store" onClick={() => copy(a)}>
-                      <Copy size={14} aria-hidden /> {copied === a.id ? "Copied" : "Copy my details"}
-                    </button>
+                {a.booked_for && <span>{a.booked_for}</span>}
+                {a.link && profile && ["pending", "checkout"].includes(a.status) && (
+                  <button type="button" className="approval-store" onClick={() => copy(a)}>
+                    <Copy size={14} aria-hidden /> {copied === a.id ? "Copied: paste them at checkout" : "Copy my details"}
+                  </button>
+                )}
+                {a.status === "checkout" && (
+                  <span className="approval-done">
+                    <ExternalLink size={16} /> {a.outcome?.payment} Orbit didn't book it, so no email from Orbit.
                   </span>
-                ) : (
-                  <span>Add your details in Profile to have them ready for checkout.</span>
-                ))}
+                )}
                 {a.status === "confirmed" && (
                   <span className="approval-done">
                     <Check size={16} /> Confirmed · {a.outcome?.reference}. {a.outcome?.payment}

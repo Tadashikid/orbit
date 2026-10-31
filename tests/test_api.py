@@ -493,3 +493,26 @@ def test_your_profile_is_encrypted_and_only_sent_to_hold_a_flight(client, monkey
     asyncio.run(main._read(main.DEMO_EMAIL, "booking__hold_flight", {"origin": "BLR", "dest": "GOI", "date": "2026-11-07",
                                                                      "airline": "IndiGo", "depart": "21:00", "price": 6411}))
     assert sent[-1] == ("booking__hold_flight", {"traveller": me})
+
+
+def test_checkout_sends_you_to_the_store_without_booking_or_emailing(client, monkeypatch):
+    """Checkout isn't Approve: Orbit books nothing and sends no "Booked" email; the store's checkout is where you pay."""
+    import notify
+    import store
+
+    sent = []
+
+    async def no_email(*a):
+        sent.append(a)
+
+    monkeypatch.setattr(notify, "confirm", no_email)
+    hold = {"hold_id": "h_none", "kind": "order", "summary": "Desk from Amazon.in", "amount": 2599,
+            "expires_at": "2099-01-01T00:00:00+00:00",
+            "details": {"store": "Amazon.in", "checkout": "https://www.amazon.in/gp/aws/cart/add.html?ASIN.1=B0X"}}
+    a = store.add_action(main.DEMO_EMAIL, "s1", hold)
+    assert client.post(f"/actions/{a['id']}/checkout", json={"hash": a["hash"][::-1]}).status_code == 409
+    done = client.post(f"/actions/{a['id']}/checkout", json={"hash": a["hash"]}).json()
+    assert done["status"] == "checkout" and "finish and pay there" in done["outcome"]["payment"] and not sent
+    assert client.post(f"/actions/{a['id']}/checkout", json={"hash": a["hash"]}).status_code == 409  # once
+    flight = store.add_action(main.DEMO_EMAIL, "s1", hold | {"kind": "flight", "details": {}})
+    assert client.post(f"/actions/{flight['id']}/checkout", json={"hash": flight["hash"]}).status_code == 409

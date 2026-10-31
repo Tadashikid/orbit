@@ -8,6 +8,7 @@ WS   /voice                            -> talk to Orbit: mic audio in, spoken re
 GET  /actions                          -> every booking the agent prepared, newest first (expired holds marked)
 POST /actions/{id}/approve {"hash"}    -> confirm a hold the agent prepared (sandbox: nothing is charged)
 POST /actions/{id}/decline             -> let it go
+POST /actions/{id}/checkout {"hash"}   -> shops and hotels: you pay on their site (no Orbit booking, no email)
 POST /me/delete                        -> delete my data: conversations, bookings, statement, Google link, my account
 GET  /me/profile, POST /me/profile     -> your checkout details (encrypted): flights are held in your name
 GET  /google/connect, /google/callback -> link your own Google Calendar + Gmail, read-only (backend/google_link.py)
@@ -231,7 +232,7 @@ async def _read(owner, name, args=None, reg=None):
     server, meta = name.partition("__")[0], {}
     if server == "finance" and owner:
         meta["owner"] = owner
-    if name == "booking__hold_flight" and owner:  # the airline needs the passenger's name: yours, from Profile
+    if name.startswith("booking__hold_") and owner:  # held in your name, to your address: from Profile
         profile = await asyncio.to_thread(_profile, owner)
         meta |= {"traveller": profile} if profile else {}
     if server in ("calendar", "gmail") and owner:
@@ -481,7 +482,8 @@ def _proposals(answer):
                     for leg in part.get("legs") or []]
         elif part["key"] == "stay" and part.get("hotel"):
             out.append(("booking__hold_stay", {"city": intent["city"], "check_in": intent["start"], "check_out": intent["end"],
-                                               "hotel": part["hotel"]["name"], "per_night": part["hotel"]["per_night"]}))
+                                               "hotel": part["hotel"]["name"], "per_night": part["hotel"]["per_night"],
+                                               "link": part["hotel"].get("link") or ""}))
         elif part["key"] == "product" and part.get("offers"):
             o = part["offers"][0]
             out.append(("booking__hold_order", {"item": o["title"], "store": o["store"], "price": o["price"],
@@ -634,6 +636,23 @@ async def approve(action_id: str, body: Approval, request: Request):
     notice = await notify.confirm(_user(request), r["result"], outcome)  # email + calendar event; never fails the booking
     store.move(_user(request), action_id, "approving", "confirmed", outcome | ({"notice": notice} if notice else {}))
     return _public(store.get_action(_user(request), action_id))
+
+
+@app.post("/actions/{action_id}/checkout")
+async def checkout(action_id: str, body: Approval, request: Request):
+    """Shops and hotels: you're sent to their checkout to review and pay there. Nothing is booked by Orbit, so no
+    confirmation email: the store sends its own once you pay. The sandbox hold is let go."""
+    me, a = _user(request), _action_or_404(request, action_id)
+    if not hmac.compare_digest(a["hash"].encode(), body.hash.encode()):
+        raise HTTPException(409, "This hold changed since you saw it. Look at it again.")
+    if not a.get("link"):
+        raise HTTPException(409, "This one has no store checkout: approve it instead")
+    if not store.move(me, action_id, "pending", "checkout", {"payment": f"Sent to {a['store']}: finish and pay there."}):
+        raise HTTPException(409, f"This hold is already {a['status']}")
+    await _read(me, "booking__release_hold", {"hold_id": a["hold_id"]})  # best effort: holds expire anyway
+    guardian.audit(f"checkout: {a['summary']}", [{"server": "booking", "tool": "release_hold", "args": {"hold_id": a["hold_id"]},
+                                                  "by": "you", "guardian": "sent to the store's checkout by you", "error": None}])
+    return _public(store.get_action(me, action_id))
 
 
 @app.post("/actions/{action_id}/decline")

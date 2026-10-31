@@ -153,8 +153,8 @@ export interface Approval {
   hash: string; // the version you saw; approving sends it back
   store?: string; // shopping orders: where to buy it, and its page (https only)
   link?: string; // shop and hotel cards: the store's checkout page
-  passenger?: string; // flights: whose name the airline holds it in (your Profile)
-  status: "pending" | "approving" | "confirmed" | "declined" | "expired" | "failed";
+  booked_for?: string; // from your Profile: "Passenger: …", "Guest: …" or "Deliver to: …"
+  status: "pending" | "approving" | "confirmed" | "checkout" | "declined" | "expired" | "failed"; // checkout: you pay at the store
   outcome?: { reference?: string; payment?: string; error?: string; notice?: string }; // notice: the confirmation email
 }
 export interface DecisionResult {

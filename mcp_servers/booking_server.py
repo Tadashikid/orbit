@@ -95,10 +95,27 @@ def _duffel(method, path, body=None):
     return data["data"]
 
 
-def _traveller(ctx):
-    """The signed-in user's profile from this request's _meta, as Duffel's passenger fields, or None."""
+def _profile(ctx):
+    """The signed-in user's Orbit profile from this request's _meta, or None."""
     meta = ctx and ctx.request_context.meta  # no ctx: called directly (tests), not over MCP
-    p = (meta.model_extra or {}).get("traveller") if meta else None
+    return (meta.model_extra or {}).get("traveller") if meta else None
+
+
+def _name(p):
+    return f"{p['first_name']} {p['last_name']}" if p else "you (add your details in Profile)"
+
+
+def _address(p):
+    """Name, phone and delivery address in one line: what a store's checkout asks for."""
+    if not p:
+        return "you (add your details in Profile)"
+    return ", ".join(x for x in (_name(p), p.get("address"), p.get("city"), p.get("state"), p.get("pincode"),
+                                 p.get("country"), p.get("phone")) if x)
+
+
+def _traveller(ctx):
+    """The profile as Duffel's passenger fields, or None."""
+    p = _profile(ctx)
     if not p:
         return None
     return {"given_name": p["first_name"], "family_name": p["last_name"], "born_on": p["born_on"], "title": p["title"],
@@ -113,6 +130,14 @@ def _checkout(link):
     if "amazon." in u.netloc and asin:
         return f"https://{u.netloc}/gp/aws/cart/add.html?{urlencode({'ASIN.1': asin[1], 'Quantity.1': 1})}"
     return link
+
+
+def _hotel_checkout(hotel, city, link):
+    """Where to book this exact hotel: its own page when search_hotels had one, else Google Hotels, where its price
+    came from, so it's always listed there (a Booking.com search may not have it)."""
+    if link.startswith("https://"):
+        return {"store": "the hotel's site", "checkout": link}
+    return {"store": "Google Hotels", "checkout": "https://www.google.com/travel/search?" + urlencode({"q": f"{hotel}, {city}"})}
 
 
 def _duffel_hold(origin, dest, date, airline, traveller=None):
@@ -148,8 +173,8 @@ def _duffel_hold(origin, dest, date, airline, traveller=None):
         "total_currency": order["total_currency"], "departing_at": legs[0].get("departing_at"),
         "arriving_at": legs[-1].get("arriving_at"),
         "flight": f"{carrier.get('iata_code', '')}{legs[0].get('marketing_carrier_flight_number', '')}",
-        "passenger": f"{(traveller or TEST_TRAVELLER)['given_name']} {(traveller or TEST_TRAVELLER)['family_name']}"
-                     + ("" if traveller else " (sample: add your details in Profile)")},
+        "booked_for": "Passenger: " + (f"{traveller['given_name']} {traveller['family_name']}" if traveller
+                                       else "Manu Demo (sample: add your details in Profile)")},
         currency=order["total_currency"], expires_at=order["payment_status"]["payment_required_by"])
 
 
@@ -175,13 +200,15 @@ def hold_flight(origin: str, dest: str, date: str, airline: str, depart: str, pr
         return _duffel_hold(origin.upper(), dest.upper(), date, airline, _traveller(ctx))
     summary = f"{airline} {origin.upper()}→{dest.upper()} {day:%a %d %b} {depart}"
     return _hold("flight", summary, _price(price, "price"),
-                 {"origin": origin.upper(), "dest": dest.upper(), "date": date, "airline": airline, "depart": depart})
+                 {"origin": origin.upper(), "dest": dest.upper(), "date": date, "airline": airline, "depart": depart,
+                  "booked_for": f"Passenger: {_name(_profile(ctx))}"})
 
 
 @mcp.tool(annotations=PREPARE)
-def hold_stay(city: str, check_in: str, check_out: str, hotel: str, per_night: int) -> dict:
+def hold_stay(city: str, check_in: str, check_out: str, hotel: str, per_night: int, link: str = "",
+              ctx: Context = None) -> dict:
     """Hold a hotel stay (an exact hotel from search_hotels) for 30 minutes. Free, reversible, nothing is paid.
-    Dates are YYYY-MM-DD; per_night in whole rupees."""
+    Dates are YYYY-MM-DD; per_night in whole rupees; link is the hotel's own page from search_hotels, if it had one."""
     nights = (Date.fromisoformat(check_out) - Date.fromisoformat(check_in)).days
     if not 1 <= nights <= 30:
         raise ValueError("check_out must be 1 to 30 nights after check_in")
@@ -189,16 +216,15 @@ def hold_stay(city: str, check_in: str, check_out: str, hotel: str, per_night: i
     summary = f"{hotel}, {city} · {nights} night{'s' if nights > 1 else ''} from {Date.fromisoformat(check_in):%a %d %b}"
     return _hold("stay", summary, amount,
                  {"city": city, "check_in": check_in, "check_out": check_out, "hotel": hotel, "per_night": per_night,
-                  "store": "Booking.com", "checkout": "https://www.booking.com/searchresults.html?" + urlencode(
-                      {"ss": f"{hotel}, {city}", "checkin": check_in, "checkout": check_out, "group_adults": 1,
-                       "no_rooms": 1, "group_children": 0})})
+                  "booked_for": f"Guest: {_name(_profile(ctx))}", **_hotel_checkout(hotel, city, link[:500])})
 
 
 @mcp.tool(annotations=PREPARE)
-def hold_order(item: str, store: str, price: int, link: str = "") -> dict:
+def hold_order(item: str, store: str, price: int, link: str = "", ctx: Context = None) -> dict:
     """Put one product (an exact offer from check_price) in a cart for 30 minutes. Free, reversible, nothing is paid."""
     return _hold("order", f"{item[:80]} from {store}", _price(price, "price"),
-                 {"item": item[:200], "store": store, "link": link[:500], "checkout": _checkout(link[:500])})
+                 {"item": item[:200], "store": store, "link": link[:500], "checkout": _checkout(link[:500]),
+                  "booked_for": f"Deliver to: {_address(_profile(ctx))}"})
 
 
 @mcp.tool(annotations=PREPARE)

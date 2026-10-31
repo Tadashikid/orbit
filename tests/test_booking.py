@@ -179,8 +179,13 @@ def test_the_flight_is_held_in_your_name_from_profile(duffel):
     assert calls[1][2]["data"]["passengers"] == [{"id": "pas_1", "given_name": "Asha", "family_name": "Rao",
                                                   "born_on": "1999-02-03", "title": "ms", "gender": "f",
                                                   "email": "asha@example.com", "phone_number": "+919876543210"}]
-    assert h["details"]["passenger"] == "Asha Rao"
-    assert "add your details" in b.hold_flight("BLR", "GOI", "2026-11-07", "Duffel Airways", "21:00", 6411)["details"]["passenger"]
+    assert h["details"]["booked_for"] == "Passenger: Asha Rao"
+    assert "add your details" in b.hold_flight("BLR", "GOI", "2026-11-07", "Duffel Airways", "21:00", 6411)["details"]["booked_for"]
+    # the same profile names the hotel guest and the delivery address
+    assert b.hold_stay("Goa", "2026-11-07", "2026-11-08", "Vibes Inn", 791, ctx=ctx)["details"]["booked_for"] == "Guest: Asha Rao"
+    me |= {"address": "12 MG Road", "city": "Bengaluru", "pincode": "560001"}
+    assert b.hold_order("Desk", "Amazon.in", 2599, ctx=ctx)["details"]["booked_for"] == \
+        "Deliver to: Asha Rao, 12 MG Road, Bengaluru, 560001, +919876543210"
 
 
 def test_shopping_and_hotels_land_on_the_stores_checkout():
@@ -188,5 +193,8 @@ def test_shopping_and_hotels_land_on_the_stores_checkout():
     assert o["details"]["checkout"] == "https://www.amazon.in/gp/aws/cart/add.html?ASIN.1=B09B8XJDW5&Quantity.1=1"
     assert b.hold_order("Kettle", "Croma", 999, "https://www.croma.com/p/1")["details"]["checkout"] == "https://www.croma.com/p/1"
     s = b.hold_stay("Goa", "2026-11-07", "2026-11-09", "Vibes Inn", 791)["details"]
-    assert s["store"] == "Booking.com" and "checkin=2026-11-07&checkout=2026-11-09" in s["checkout"]
+    # the hotel's price came from Google Hotels, so that's where it's surely listed (Booking.com may not have it)
+    assert (s["store"], s["checkout"]) == ("Google Hotels", "https://www.google.com/travel/search?q=Vibes+Inn%2C+Goa")
+    own = b.hold_stay("Goa", "2026-11-07", "2026-11-09", "Vibes Inn", 791, "https://vibesinn.example/book")["details"]
+    assert (own["store"], own["checkout"]) == ("the hotel's site", "https://vibesinn.example/book")
     assert "Amazon.in's checkout" in b.confirm_hold(o["hold_id"])["payment"]

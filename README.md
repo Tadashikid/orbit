@@ -12,8 +12,8 @@ for you, and books only when you tap **Approve**. Every answer comes with a rece
 - **Bookings:** Duffel test-mode flights (real API, test balance), sandbox hotels, shopping with a link to the store.
   Approving one sends a confirmation (calendar invitation for flights and stays) via a Google Apps Script.
 - **Profile → checkout:** type your details once (name, date of birth, phone, address; encrypted with
-  `ORBIT_TOKEN_KEY`). Flights are held with Duffel in your name; shop and hotel cards have a **Checkout** button that
-  opens the store (Amazon's cart, Booking.com with your dates) with your details ready to copy. You pay there.
+  `ORBIT_TOKEN_KEY`). Flights are held with Duffel in your name; every card says who it's for. Shop and hotel cards have a **Checkout** button that
+  opens the store (Amazon's cart, the hotel on Google Hotels) with your details copied. You pay there; Orbit sends no email.
 - **Voice:** Gemini Live, plus an opt-in "Hey Orbit" wake word (Edge; Chrome's speech service may not connect).
 - **Accounts:** sign up / sign in with Google or email + password (Firebase Auth, verified email). Each account has
   its own conversations, bookings, statement and switches (Firestore), can **Connect Google** to read its real
