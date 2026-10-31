@@ -98,7 +98,7 @@ def _action(row):
     shop |= {"booked_for": d["booked_for"]} if d.get("booked_for") else {}
     return {"id": action_id, "session": session, "hold_id": h["hold_id"], "kind": h["kind"], "summary": h["summary"],
             "amount": h["amount"], "currency": h.get("currency", "INR"), "expires_at": h["expires_at"], "hash": digest,
-            "status": status, **shop,
+            "status": status, "details": d, **shop,
             **({"outcome": json.loads(outcome)} if outcome else {})}
 
 

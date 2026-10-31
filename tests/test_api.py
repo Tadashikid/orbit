@@ -516,3 +516,29 @@ def test_checkout_sends_you_to_the_store_without_booking_or_emailing(client, mon
     assert client.post(f"/actions/{a['id']}/checkout", json={"hash": a["hash"]}).status_code == 409  # once
     flight = store.add_action(main.DEMO_EMAIL, "s1", hold | {"kind": "flight", "details": {}})
     assert client.post(f"/actions/{flight['id']}/checkout", json={"hash": flight["hash"]}).status_code == 409
+
+
+def test_ive_paid_sends_the_confirmation_after_checkout(client, monkeypatch):
+    """Paid at the store -> "I've paid" -> the confirmation email. Not before checkout, and only once."""
+    import notify
+    import store
+
+    sent = []
+
+    async def email(to, booking, outcome):
+        sent.append((booking["kind"], booking["details"]["store"], outcome["paid_at"]))
+        return f"Confirmation emailed to {to}."
+
+    monkeypatch.setattr(notify, "confirm", email)
+    hold = {"hold_id": "h_none", "kind": "order", "summary": "Desk from Amazon.in", "amount": 2599,
+            "expires_at": "2099-01-01T00:00:00+00:00",
+            "details": {"store": "Amazon.in", "checkout": "https://www.amazon.in/gp/aws/cart/add.html?ASIN.1=B0X"}}
+    a = store.add_action(main.DEMO_EMAIL, "s1", hold)
+    assert client.post(f"/actions/{a['id']}/paid").status_code == 409 and not sent  # not checked out yet
+    client.post(f"/actions/{a['id']}/checkout", json={"hash": a["hash"]})
+    done = client.post(f"/actions/{a['id']}/paid").json()
+    assert done["status"] == "confirmed" and done["outcome"]["notice"].startswith("Confirmation emailed")
+    assert sent == [("order", "Amazon.in", "Amazon.in")] and "details" not in done
+    assert client.post(f"/actions/{a['id']}/paid").status_code == 409 and len(sent) == 1  # once
+    subject, body = notify.message(a, {"payment": "Paid at Amazon.in.", "paid_at": "Amazon.in"})
+    assert "You paid at Amazon.in" in body and "no real money" not in body

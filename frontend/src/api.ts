@@ -85,6 +85,7 @@ export interface OrbitApi {
   approve(action: Approval): Promise<Approval>;
   decline(action: Approval): Promise<Approval>;
   checkout(action: Approval): Promise<Approval>; // shops and hotels: off to their checkout; Orbit books nothing
+  paid(action: Approval): Promise<Approval>; // after checkout: you paid there; Orbit sends the confirmation
   actions(): Promise<Approval[]>; // every booking, newest first (the Bookings window)
   servers(): Promise<{ servers: Server[]; today: string }>;
   setSource(id: string, on: boolean): Promise<{ servers: Server[]; today: string }>;
@@ -301,6 +302,9 @@ export const api: OrbitApi = {
   },
   async decline(action) {
     return call<Approval>(`/actions/${action.id}/decline`, {});
+  },
+  async paid(action) {
+    return call<Approval>(`/actions/${action.id}/paid`, {});
   },
   async checkout(action) {
     return call<Approval>(`/actions/${action.id}/checkout`, { hash: action.hash });

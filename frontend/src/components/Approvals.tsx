@@ -51,7 +51,7 @@ export default function Approvals({
     void copy(a);
     void act(a, "checkout");
   };
-  const act = async (a: Approval, how: "approve" | "decline" | "checkout") => {
+  const act = async (a: Approval, how: "approve" | "decline" | "checkout" | "paid") => {
     setBusy(a.id);
     setErrors((e) => ({ ...e, [a.id]: "" }));
     try {
@@ -91,12 +91,12 @@ export default function Approvals({
                 )}
                 {a.status === "checkout" && (
                   <span className="approval-done">
-                    <ExternalLink size={16} /> {a.outcome?.payment} Orbit didn't book it, so no email from Orbit.
+                    <ExternalLink size={16} /> {a.outcome?.payment} Paid? Tap “I've paid” and Orbit sends your confirmation.
                   </span>
                 )}
                 {a.status === "confirmed" && (
                   <span className="approval-done">
-                    <Check size={16} /> Confirmed · {a.outcome?.reference}. {a.outcome?.payment}
+                    <Check size={16} /> Confirmed{a.outcome?.reference ? ` · ${a.outcome.reference}` : ""}. {a.outcome?.payment}
                   </span>
                 )}
                 {a.status === "confirmed" && a.outcome?.notice && <span className="approval-done">{a.outcome.notice}</span>}
@@ -116,6 +116,13 @@ export default function Approvals({
                   </span>
                 )}
               </div>
+              {a.status === "checkout" && (
+                <div className="approval-actions">
+                  <Button tone="forest" aria-label={`I've paid for ${a.summary}`} disabled={busy === a.id} onClick={() => act(a, "paid")}>
+                    I've paid
+                  </Button>
+                </div>
+              )}
               {a.status === "pending" && (
                 <div className="approval-actions">
                   {a.link?.startsWith("https://") ? (

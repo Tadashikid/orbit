@@ -9,6 +9,7 @@ GET  /actions                          -> every booking the agent prepared, newe
 POST /actions/{id}/approve {"hash"}    -> confirm a hold the agent prepared (sandbox: nothing is charged)
 POST /actions/{id}/decline             -> let it go
 POST /actions/{id}/checkout {"hash"}   -> shops and hotels: you pay on their site (no Orbit booking, no email)
+POST /actions/{id}/paid                -> after checkout: you paid there; sends the confirmation email / invite
 POST /me/delete                        -> delete my data: conversations, bookings, statement, Google link, my account
 GET  /me/profile, POST /me/profile     -> your checkout details (encrypted): flights are held in your name
 GET  /google/connect, /google/callback -> link your own Google Calendar + Gmail, read-only (backend/google_link.py)
@@ -468,7 +469,7 @@ def _sse(event):
 
 
 def _public(action):
-    return {k: v for k, v in action.items() if k not in ("session", "hold_id")}
+    return {k: v for k, v in action.items() if k not in ("session", "hold_id", "details")}
 
 
 def _proposals(answer):
@@ -652,6 +653,22 @@ async def checkout(action_id: str, body: Approval, request: Request):
     await _read(me, "booking__release_hold", {"hold_id": a["hold_id"]})  # best effort: holds expire anyway
     guardian.audit(f"checkout: {a['summary']}", [{"server": "booking", "tool": "release_hold", "args": {"hold_id": a["hold_id"]},
                                                   "by": "you", "guardian": "sent to the store's checkout by you", "error": None}])
+    return _public(store.get_action(me, action_id))
+
+
+@app.post("/actions/{action_id}/paid")
+async def paid(action_id: str, request: Request):
+    """After Checkout: you tell Orbit you paid at the store. Then it sends the confirmation (email, and a calendar
+    invitation for a hotel), like an approved flight. Orbit can't see the store's payment, so your word is the signal."""
+    me, a = _user(request), _action_or_404(request, action_id)
+    outcome = {"payment": f"Paid at {a['store']}.", "paid_at": a["store"],
+               "confirmed_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+    if not store.move(me, action_id, "checkout", "approving"):
+        raise HTTPException(409, f"Only a card sent to checkout can be marked paid (this one is {a['status']})")
+    notice = await notify.confirm(me, a, outcome)
+    store.move(me, action_id, "approving", "confirmed", outcome | ({"notice": notice} if notice else {}))
+    guardian.audit(f"paid at the store: {a['summary']}", [{"server": "orbit", "tool": "mark_paid", "args": {},
+                                                          "by": "you", "guardian": "told by you", "error": None}])
     return _public(store.get_action(me, action_id))
 
 
