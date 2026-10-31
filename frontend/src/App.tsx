@@ -901,7 +901,7 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
         </Modal>
       )}
       {profileOpen && me && (
-        <Modal title="YOUR DETAILS, ONCE." label="your_profile" onClose={() => setProfileOpen(false)}>
+        <Modal title="YOUR DETAILS." label="your_profile" onClose={() => setProfileOpen(false)}>
           <ProfileForm
             saved={me.profile}
             email={me.email}
