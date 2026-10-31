@@ -236,6 +236,10 @@ def test_hotels_are_real_rooms(monkeypatch, tmp_path):
         {"type": "hotel", "name": "The Byke Retreat", "rate_per_night": {"extracted_lowest": 1490}, "overall_rating": 4.5},
     ]}
     assert [h["name"] for h in travel_server._hotels(data)] == ["The Byke Retreat", "Sibaya Beach Resort"]
+    # with taxes: Google's total for the stay / nights, which is what the hotel's page charges
+    taxed = {"properties": [{"type": "hotel", "name": "Vibes Inn", "rate_per_night": {"extracted_lowest": 791},
+                             "total_rate": {"extracted_lowest": 2874}}]}
+    assert travel_server._hotels(taxed, nights=2)[0]["per_night"] == 1437
     monkeypatch.setenv("ORBIT_OFFLINE", "1")
     monkeypatch.setattr(travel_server, "HOTELS_CACHE", tmp_path / "hotels_cache.json")
     r = asyncio.run(travel_server.search_hotels("Goa", "2026-10-10", "2026-10-11"))
@@ -264,3 +268,14 @@ def test_price_falls_back_from_a_sku_to_its_model(tmp_path, monkeypatch):
     out = asyncio.run(price_server.check_price("HP Omen 16-am0076TX"))
     assert [x["price"] for x in out["results"]] == [145299, 166995, 168616]
     assert "hp omen 16" in out["note"]
+
+
+def test_a_hotel_links_to_its_own_google_hotels_page():
+    import travel_server
+
+    data = {"properties": [{"type": "hotel", "name": "Vibes Inn", "rate_per_night": {"extracted_lowest": 790},
+                            "property_token": "ChkIabc", "link": "http://vibesinn.com/"},
+                           {"type": "hotel", "name": "No Token Inn", "rate_per_night": {"extracted_lowest": 900},
+                            "link": "https://notoken.example/"}]}
+    links = [h["link"] for h in travel_server._hotels(data)]
+    assert links == ["https://www.google.com/travel/hotels/entity/ChkIabc?hl=en-IN&gl=in&curr=INR", "https://notoken.example/"]

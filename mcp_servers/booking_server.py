@@ -133,14 +133,14 @@ def _checkout(link):
 
 
 def _hotel_checkout(hotel, city, link):
-    """Where to book this exact hotel: its own page when search_hotels had one, else Google Hotels, where its price
-    came from, so it's always listed there (a Booking.com search may not have it)."""
+    """Where to book this exact hotel: the page search_hotels gave (its Google Hotels page, or its own site), else a
+    Google Hotels search for it, where its price came from (a Booking.com search may not have it)."""
     if link.startswith("https://"):
-        return {"store": "the hotel's site", "checkout": link}
+        return {"store": "Google Hotels" if "google.com/travel/" in link else "the hotel's site", "checkout": link}
     return {"store": "Google Hotels", "checkout": "https://www.google.com/travel/search?" + urlencode({"q": f"{hotel}, {city}"})}
 
 
-def _duffel_hold(origin, dest, date, airline, traveller=None):
+def _duffel_hold(origin, dest, date, airline, depart, price, traveller=None):
     """A real Duffel hold order (test mode): the cheapest fare that can be held, the same airline if it's there."""
     request = _duffel("POST", "/air/offer_requests?return_offers=true", {"data": {
         "slices": [{"origin": origin, "destination": dest, "departure_date": date}],
@@ -166,20 +166,18 @@ def _duffel_hold(origin, dest, date, airline, traveller=None):
     else:
         raise ValueError(f"Duffel's fares from {origin} to {dest} on {date} kept selling out. Try again in a minute.")
     owner = offer["owner"]["name"]
-    legs = (order.get("slices") or [{}])[0].get("segments") or [{}]  # the times and flight number, for the calendar
-    carrier = legs[0].get("marketing_carrier") or {}
-    # Named after the airline you were quoted (the real fare); the test hold's sandbox airline only when it differs.
+    # The card, the price you approve and the calendar are the real fare SerpAPI found (Google Flights): airline, time,
+    # rupees. Duffel's test mode only has made-up flights, so its order is the booking mechanism underneath, paid from
+    # its test balance at its own price (kept here so a price change still stops the payment).
     held_as = "" if owner.lower() == airline.lower() else f" as {owner}"
-    summary = f"{airline} {origin}→{dest} {Date.fromisoformat(date):%a %d %b} · Duffel test hold{held_as}"
-    return _hold("flight", summary, float(order["total_amount"]), {
-        "provider": "duffel", "order_id": order["id"], "offer_id": offer["id"], "airline": owner, "asked_for": airline,
-        "origin": origin, "dest": dest, "date": date, "total_amount": order["total_amount"],
-        "total_currency": order["total_currency"], "departing_at": legs[0].get("departing_at"),
-        "arriving_at": legs[-1].get("arriving_at"),
-        "flight": f"{carrier.get('iata_code', '')}{legs[0].get('marketing_carrier_flight_number', '')}",
+    summary = f"{airline} {origin}→{dest} {Date.fromisoformat(date):%a %d %b} {depart} · Duffel test hold{held_as}"
+    return _hold("flight", summary, _price(price, "price"), {
+        "provider": "duffel", "order_id": order["id"], "offer_id": offer["id"], "airline": airline, "held_as": owner,
+        "asked_for": airline, "origin": origin, "dest": dest, "date": date, "depart": depart,
+        "total_amount": order["total_amount"], "total_currency": order["total_currency"],
         "booked_for": "Passenger: " + (f"{traveller['given_name']} {traveller['family_name']}" if traveller
                                        else "Manu Demo (sample: add your details in Profile)")},
-        currency=order["total_currency"], expires_at=order["payment_status"]["payment_required_by"])
+        expires_at=order["payment_status"]["payment_required_by"])
 
 
 def _duffel_pay(h):
@@ -201,7 +199,7 @@ def hold_flight(origin: str, dest: str, date: str, airline: str, depart: str, pr
     (its fare and deadline); otherwise a 30-minute sandbox hold at the given price."""
     day = Date.fromisoformat(date)
     if _duffel_token():
-        return _duffel_hold(origin.upper(), dest.upper(), date, airline, _traveller(ctx))
+        return _duffel_hold(origin.upper(), dest.upper(), date, airline, depart, price, _traveller(ctx))
     summary = f"{airline} {origin.upper()}→{dest.upper()} {day:%a %d %b} {depart}"
     return _hold("flight", summary, _price(price, "price"),
                  {"origin": origin.upper(), "dest": dest.upper(), "date": date, "airline": airline, "depart": depart,

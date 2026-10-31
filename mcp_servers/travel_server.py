@@ -113,16 +113,23 @@ async def _live(origin, dest, day):
     return (fares, None) if fares else (None, "SerpAPI found no flights")
 
 
-def _hotels(data):
+GOOGLE_HOTEL = "https://www.google.com/travel/hotels/entity/{}?hl=en-IN&gl=in&curr=INR"
+
+
+def _hotels(data, nights=1):
     """SerpAPI Google Hotels JSON -> [{name, per_night, rating, reviews, stars, link}], cheapest first.
-    Real rooms only: hostels (a dorm bed's price) and vacation rentals (whole flats) are left out."""
+    Real rooms only: hostels (a dorm bed's price) and vacation rentals (whole flats) are left out. per_night includes
+    taxes and fees (the stay's total / nights) when Google gives it: what you'd pay on the hotel's page."""
     hotels = []
     for p in data.get("properties", []):
-        rate = (p.get("rate_per_night") or {}).get("extracted_lowest")
+        total = (p.get("total_rate") or {}).get("extracted_lowest")
+        rate = total / nights if isinstance(total, (int, float)) else (p.get("rate_per_night") or {}).get("extracted_lowest")
         if p.get("type") != "hotel" or not isinstance(rate, (int, float)) or rate <= 0 or HOSTEL.search(p.get("name", "")):
             continue
         hotels.append({"name": p.get("name", "")[:80], "per_night": round(rate), "rating": p.get("overall_rating"),
-                       "reviews": p.get("reviews"), "stars": p.get("extracted_hotel_class"), "link": p.get("link")})
+                       "reviews": p.get("reviews"), "stars": p.get("extracted_hotel_class"),
+                       # this exact hotel's Google page (its prices from every site, in rupees), else its own website
+                       "link": GOOGLE_HOTEL.format(p["property_token"]) if p.get("property_token") else p.get("link")})
     return sorted(hotels, key=lambda h: h["per_night"])[:MAX_HOTELS]
 
 
@@ -132,7 +139,7 @@ async def _live_hotels(city, check_in, check_out):
                                 "adults": 1, "currency": "INR", "gl": "in", "hl": "en", "hotel_class": "2,3,4"})
     if why:
         return None, why
-    hotels = _hotels(data)
+    hotels = _hotels(data, (Date.fromisoformat(check_out) - Date.fromisoformat(check_in)).days)
     return (hotels, None) if hotels else (None, "SerpAPI found no hotels")
 
 
