@@ -203,3 +203,24 @@ def test_shopping_and_hotels_land_on_the_stores_checkout():
     own = b.hold_stay("Goa", "2026-11-07", "2026-11-09", "Vibes Inn", 791, "https://vibesinn.example/book")["details"]
     assert (own["store"], own["checkout"]) == ("the hotel's site", "https://vibesinn.example/book")
     assert "Amazon.in's checkout" in b.confirm_hold(o["hold_id"])["payment"]
+
+
+def test_a_hotel_checkout_lands_on_a_booking_site_with_your_dates(monkeypatch):
+    """Its Google page's token -> SerpAPI's booking sites for those dates -> Booking.com's page for that hotel, dates
+    and room, at Booking.com's price. Dorm sites are skipped; no answer falls back to the Google page."""
+    asked = []
+
+    def offers(token, check_in, check_out):
+        asked.append((token, check_in, check_out))
+        return [{"source": "Hostelworld", "link": "https://hostelworld.example/x", "total": 790},
+                {"source": "Booking.com", "link": "https://www.google.com/travel/lodging/clk?pcurl=booking", "total": 1039.5}]
+
+    monkeypatch.setattr(b, "_hotel_offers", offers)
+    google = "https://www.google.com/travel/hotels/entity/ChkIabc?hl=en-IN&gl=in&curr=INR"
+    h = b.hold_stay("Goa", "2026-11-07", "2026-11-08", "Vibes Inn", 790, google)
+    assert asked == [("ChkIabc", "2026-11-07", "2026-11-08")]
+    assert (h["details"]["store"], h["details"]["checkout"], h["amount"]) == \
+        ("Booking.com", "https://www.google.com/travel/lodging/clk?pcurl=booking", 1040)
+    monkeypatch.setattr(b, "_hotel_offers", lambda *a: [])  # offline / SerpAPI down
+    h = b.hold_stay("Goa", "2026-11-07", "2026-11-08", "Vibes Inn", 790, google)
+    assert (h["details"]["store"], h["details"]["checkout"], h["amount"]) == ("Google Hotels", google, 790)

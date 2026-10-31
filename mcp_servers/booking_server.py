@@ -132,9 +132,38 @@ def _checkout(link):
     return link
 
 
-def _hotel_checkout(hotel, city, link):
-    """Where to book this exact hotel: the page search_hotels gave (its Google Hotels page, or its own site), else a
+# Where to send you for a hotel, in this order: big booking sites whose link keeps the hotel, dates and room. Dorm-bed
+# sites (Hostelworld) and the hotel's own listing (its Google price is sometimes nonsense) are left out.
+BOOKING_SITES = ("Booking.com", "MakeMyTrip", "Agoda", "Goibibo", "Expedia", "Cleartrip", "Trip.com", "Hotels.com")
+GOOGLE_HOTEL = re.compile(r"google\.com/travel/hotels/entity/([\w-]+)")
+
+
+def _hotel_offers(token, check_in, check_out):
+    """SerpAPI's booking sites for one hotel (its Google property_token) on these dates: [{source, link, total}],
+    total in rupees with taxes. [] when live search is off or SerpAPI fails: the card then links Google Hotels."""
+    key = os.getenv("SERPAPI_API_KEY")
+    if os.getenv("ORBIT_OFFLINE") or not key:
+        return []
+    try:
+        data = httpx.get("https://serpapi.com/search", timeout=7, params={  # under the registry's 10 s per tool call
+            "engine": "google_hotels", "q": "hotel", "property_token": token, "check_in_date": check_in,
+            "check_out_date": check_out, "adults": 1, "currency": "INR", "gl": "in", "hl": "en", "api_key": key}).json()
+    except (httpx.HTTPError, ValueError):  # never the exception text: the URL has the key
+        return []
+    return [{"source": p.get("source", ""), "link": p["link"], "total": p["total_rate"]["extracted_lowest"]}
+            for p in data.get("prices", []) if str(p.get("link", "")).startswith("https://")
+            and isinstance((p.get("total_rate") or {}).get("extracted_lowest"), (int, float))]
+
+
+def _hotel_checkout(hotel, city, link, check_in, check_out):
+    """Where to book this exact hotel. Best: a booking site's own page for it, with your dates and a room picked, and
+    that site's price (taxes in). Else the page search_hotels gave (its Google Hotels page, or its own site), else a
     Google Hotels search for it, where its price came from (a Booking.com search may not have it)."""
+    token = GOOGLE_HOTEL.search(link)
+    offers = _hotel_offers(token[1], check_in, check_out) if token else []
+    pick = next((o for site in BOOKING_SITES for o in offers if o["source"] == site), None)
+    if pick:
+        return {"store": pick["source"], "checkout": pick["link"], "site_total": round(pick["total"])}
     if link.startswith("https://"):
         return {"store": "Google Hotels" if "google.com/travel/" in link else "the hotel's site", "checkout": link}
     return {"store": "Google Hotels", "checkout": "https://www.google.com/travel/search?" + urlencode({"q": f"{hotel}, {city}"})}
@@ -215,10 +244,13 @@ def hold_stay(city: str, check_in: str, check_out: str, hotel: str, per_night: i
     if not 1 <= nights <= 30:
         raise ValueError("check_out must be 1 to 30 nights after check_in")
     amount = _price(per_night, "per_night") * nights
+    where = _hotel_checkout(hotel, city, link[:500], check_in, check_out)
+    # the price on the booking site you'll land on (taxes in), so the card and the checkout page agree
+    amount = _price(where.pop("site_total", None) or amount, "price")
     summary = f"{hotel}, {city} · {nights} night{'s' if nights > 1 else ''} from {Date.fromisoformat(check_in):%a %d %b}"
     return _hold("stay", summary, amount,
                  {"city": city, "check_in": check_in, "check_out": check_out, "hotel": hotel, "per_night": per_night,
-                  "booked_for": f"Guest: {_name(_profile(ctx))}", **_hotel_checkout(hotel, city, link[:500])})
+                  "booked_for": f"Guest: {_name(_profile(ctx))}", **where})
 
 
 @mcp.tool(annotations=PREPARE)
