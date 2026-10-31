@@ -30,10 +30,6 @@ export default function ProfileForm({ saved, email, onSaved }: { saved: Profile 
   };
   return (
     <form className="profile-form" onSubmit={save}>
-      <p>
-        Orbit fills these in for you: flights are held in your name, and shop and hotel cards take you to the store's
-        checkout with your details ready to copy. You review and pay there. Kept encrypted; Delete my data removes them.
-      </p>
       <div className="profile-grid">
         {field("first_name", "First name", { required: true, maxLength: 60, autoComplete: "given-name" })}
         {field("last_name", "Last name", { required: true, maxLength: 60, autoComplete: "family-name" })}
