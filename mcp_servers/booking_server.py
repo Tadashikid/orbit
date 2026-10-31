@@ -150,9 +150,11 @@ def _duffel_hold(origin, dest, date, airline, traveller=None):
         raise ValueError(f"Duffel has no fare from {origin} to {dest} on {date} that can be held. Book it with the airline.")
     cheapest = sorted(holdable, key=lambda o: float(o["total_amount"]))
     same = [o for o in cheapest if o["owner"]["name"].lower() == airline.lower()]
-    # Fares go stale between search and order ("offer_no_longer_available"): the airline you priced first, then the
-    # cheapest others (Duffel's test mode never sells some airlines, e.g. Air India). The summary names who's held.
-    for offer in same[:3] + [o for o in cheapest if o not in same][:3]:
+    # Fares go stale between search and order ("offer_no_longer_available"): the airline you priced first, then
+    # Duffel's own made-up "Duffel Airways", then the cheapest others. Test mode invents fares under real names too
+    # (British Airways BLR→GOI), which would look like a real flight that doesn't exist; the made-up airline doesn't.
+    test = [o for o in cheapest if o not in same and o["owner"]["name"] == "Duffel Airways"]
+    for offer in same[:3] + test[:3] + [o for o in cheapest if o not in same and o not in test][:3]:
         try:
             order = _duffel("POST", "/air/orders", {"data": {
                 "type": "hold", "selected_offers": [offer["id"]],
@@ -166,7 +168,9 @@ def _duffel_hold(origin, dest, date, airline, traveller=None):
     owner = offer["owner"]["name"]
     legs = (order.get("slices") or [{}])[0].get("segments") or [{}]  # the times and flight number, for the calendar
     carrier = legs[0].get("marketing_carrier") or {}
-    summary = f"{owner} {origin}→{dest} {Date.fromisoformat(date):%a %d %b} · Duffel test"
+    # Named after the airline you were quoted (the real fare); the test hold's sandbox airline only when it differs.
+    held_as = "" if owner.lower() == airline.lower() else f" as {owner}"
+    summary = f"{airline} {origin}→{dest} {Date.fromisoformat(date):%a %d %b} · Duffel test hold{held_as}"
     return _hold("flight", summary, float(order["total_amount"]), {
         "provider": "duffel", "order_id": order["id"], "offer_id": offer["id"], "airline": owner, "asked_for": airline,
         "origin": origin, "dest": dest, "date": date, "total_amount": order["total_amount"],

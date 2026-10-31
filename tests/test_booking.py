@@ -88,7 +88,7 @@ def test_duffel_hold_then_pay_from_test_balance(duffel):
     assert calls[1] == ("POST", "/air/orders", {"data": {"type": "hold", "selected_offers": ["off_same2"],
                                                          "passengers": [{"id": "pas_1", **b.TEST_TRAVELLER}]}})
     assert (h["amount"], h["currency"], h["sandbox"], h["expires_at"]) == (91.2, "GBP", False, "2099-01-01T10:00:00Z")
-    assert h["summary"] == "Duffel Airways BLR→GOI Sat 07 Nov · Duffel test"
+    assert h["summary"] == "Duffel Airways BLR→GOI Sat 07 Nov · Duffel test hold"
     done = b.confirm_hold(h["hold_id"])
     assert calls[-2] == ("POST", "/air/payments", {"data": {"order_id": "ord_1", "payment": {
         "type": "balance", "amount": "91.20", "currency": "GBP"}}})  # the exact price you approved
@@ -97,8 +97,10 @@ def test_duffel_hold_then_pay_from_test_balance(duffel):
 
 def test_duffel_price_change_stops_the_payment(duffel):
     calls, order = duffel
-    h = b.hold_flight("BLR", "GOI", "2026-11-07", "IndiGo", "21:00", 6411)  # no IndiGo: cheapest holdable instead
-    assert calls[1][2]["data"]["selected_offers"] == ["off_other"]
+    h = b.hold_flight("BLR", "GOI", "2026-11-07", "IndiGo", "21:00", 6411)
+    # no IndiGo: Duffel's made-up airline, not a test fare under a real name (British Airways doesn't fly BLR→GOI)
+    assert calls[1][2]["data"]["selected_offers"] == ["off_same2"]
+    assert h["summary"] == "IndiGo BLR→GOI Sat 07 Nov · Duffel test hold as Duffel Airways"
     order["total_amount"] = "99.90"
     with pytest.raises(ValueError, match="price changed to GBP 99.90"):
         b.confirm_hold(h["hold_id"])
@@ -144,7 +146,8 @@ def test_an_airline_duffel_never_sells_falls_back_to_another(duffel, monkeypatch
     monkeypatch.setattr(b, "_duffel", duffel_airways_sold_out)
     h = b.hold_flight("BLR", "GOI", "2026-11-07", "Duffel Airways", "21:00", 6411)
     assert tried == ["off_same2", "off_same", "off_other"]  # the airline you priced first, then the cheapest other
-    assert h["summary"].startswith("British Airways BLR→GOI") and h["details"]["asked_for"] == "Duffel Airways"
+    assert h["summary"] == "Duffel Airways BLR→GOI Sat 07 Nov · Duffel test hold as British Airways"
+    assert h["details"]["asked_for"] == "Duffel Airways"
 
 
 def test_declining_a_duffel_hold_cancels_it_with_duffel(duffel, monkeypatch):
