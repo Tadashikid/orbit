@@ -1,5 +1,5 @@
-"""After you approve a booking, one email: a flight or stay is a calendar invitation (the event + its details), a
-shopping order a plain email. Sent by a Google Apps Script web app
+"""After you approve a booking (or pay at a store's checkout and tap "I've paid"), one email from Orbit with the
+details; a flight or stay also goes on your calendar, without a second invitation email. Sent by a Google Apps Script web app
 (scripts/orbit_notify.gs, deployed in the demo Google account). ORBIT_NOTIFY_URL + ORBIT_NOTIFY_SECRET in .env;
 unset = no confirmations, bookings work the same.
 
@@ -60,4 +60,4 @@ async def confirm(to, booking, outcome):
         return f"The confirmation email couldn't be sent ({type(e).__name__})."
     if not r.get("ok"):
         return f"The confirmation email couldn't be sent ({str(r.get('error'))[:120]})."
-    return f"Added to your calendar; the invitation with the details went to {to}." if ev else f"Confirmation emailed to {to}."
+    return f"Confirmation emailed to {to}" + (" and added to your calendar." if ev else ".")

@@ -382,7 +382,7 @@ def test_a_confirmed_booking_is_emailed_and_added_to_your_calendar(client, monke
 
     done = client.post(f"/actions/{out['id']}/approve", json={"hash": out["hash"]}).json()
     assert done["status"] == "confirmed" and done["outcome"]["notice"] == (
-        f"Added to your calendar; the invitation with the details went to {main.DEMO_EMAIL}.")
+        f"Confirmation emailed to {main.DEMO_EMAIL} and added to your calendar.")
     sent = posts[0]
     assert (sent["secret"], sent["to"]) == ("s3cret", main.DEMO_EMAIL) and sent["subject"] == f"Booked: {out['summary']}"
     assert sent["event"]["all_day"] is False and sent["event"]["start"].endswith("+05:30")
