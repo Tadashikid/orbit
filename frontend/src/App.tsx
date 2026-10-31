@@ -6,6 +6,7 @@ import {
   Info,
   LogOut,
   UserX,
+  UserRound,
   Mic,
   MessageCircle,
   SlidersHorizontal,
@@ -29,7 +30,8 @@ import type { Tab } from "./screens/Panels";
 const Panels = lazy(() => import("./screens/Panels"));
 import { ConnectDialog, SetupDialog } from "./screens/Dialogs";
 import { Skeleton, Button, Chip, Modal, AnimatedAmount } from "./components/ui";
-import { api, type GoogleStatus } from "./api";
+import { api, type GoogleStatus, type ProfileStatus } from "./api";
+import ProfileForm from "./components/ProfileForm";
 import { invalidInput } from "./input";
 import { useDecision } from "./hooks/useDecision";
 import { Voice, voiceSummary, type VoiceEvent } from "./voice";
@@ -126,6 +128,22 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
   });
   useEffect(() => {
     api.googleStatus().then(setGoogle, () => undefined);
+  }, []);
+  // Profile: your checkout details. Asked for once, the first time a signed-in account has none.
+  const [me, setMe] = useState<ProfileStatus | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  useEffect(() => {
+    api.profile().then((s) => {
+      setMe(s);
+      let asked = false;
+      try {
+        asked = localStorage.getItem(`orbit.profile.asked.${s.email}`) === "1";
+        localStorage.setItem(`orbit.profile.asked.${s.email}`, "1");
+      } catch {
+        // storage blocked: just ask
+      }
+      if (s.ready && !s.profile && !asked) setProfileOpen(true);
+    }, () => undefined);
   }, []);
   const deleteMe = async () => {
     if (!confirm("Delete your Orbit account and everything it keeps? Your conversations, booking cards, bank statement " +
@@ -464,6 +482,12 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
             <span>Bookings</span>
             {waiting > 0 && <span className="booking-badge">{waiting}</span>}
           </button>
+          {me?.ready && (
+            <button className="header-budget" aria-label="Profile: your checkout details" onClick={() => setProfileOpen(true)}>
+              <UserRound size={18} />
+              <span>{me.profile ? me.profile.first_name : "Add your details"}</span>
+            </button>
+          )}
           {google?.configured && (
             <button
               className="header-budget"
@@ -684,7 +708,7 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
               <span>Free and reversible. Nothing is booked until you approve it.</span>
             </div>
           )}
-          {d.phase === "done" && <Approvals items={d.approvals} onChange={bookingChanged} />}
+          {d.phase === "done" && <Approvals items={d.approvals} onChange={bookingChanged} profile={me?.profile} />}
           {d.phase === "done" && chat && d.verdict && (
             <div className="agent-reply" role="status">
               <MessageCircle size={20} aria-hidden />
@@ -876,10 +900,22 @@ export default function App({ onSignOut }: { onSignOut?: () => void }) {
           </Button>
         </Modal>
       )}
+      {profileOpen && me && (
+        <Modal title="YOUR DETAILS, ONCE." label="your_profile" onClose={() => setProfileOpen(false)}>
+          <ProfileForm
+            saved={me.profile}
+            email={me.email}
+            onSaved={(profile) => {
+              setMe({ ...me, profile });
+              setProfileOpen(false);
+            }}
+          />
+        </Modal>
+      )}
       {bookingsOpen && (
         <Modal title="READY WHEN YOU ARE." label="your_bookings" onClose={closeBookings}>
           {sortedBookings.length ? (
-            <Approvals items={sortedBookings} onChange={bookingChanged} inWindow />
+            <Approvals items={sortedBookings} onChange={bookingChanged} inWindow profile={me?.profile} />
           ) : (
             <p className="approvals-empty">
               Nothing on hold yet. Ask Orbit to book something, like “Book a Goa trip next weekend”, and it will show

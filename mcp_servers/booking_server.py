@@ -13,23 +13,26 @@ Confirming is the separate, final step.
 Run:  .venv\\Scripts\\python mcp_servers\\booking_server.py
 """
 import json
+import re
 import logging
 import os
 import secrets
 from datetime import date as Date
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import urlencode, urlsplit
 
 import httpx
 from dotenv import load_dotenv
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 logging.getLogger("httpx").setLevel(logging.WARNING)  # request logs would print Duffel URLs; keep them out
 IST = timezone(timedelta(hours=5, minutes=30))
 DUFFEL = "https://api.duffel.com"
-# Duffel needs a named traveller for an order. Test mode only, so a made-up one: never the user's real details.
+# Duffel needs a named traveller for an order: the user's Orbit profile (sent by the backend in _meta, never by the
+# model), else this made-up one.
 TEST_TRAVELLER = {"given_name": "Manu", "family_name": "Demo", "born_on": "1998-04-12", "title": "mr", "gender": "m",
                   "email": "manu.demo@example.com", "phone_number": "+442080160508"}
 # The session's holds (gitignored). ORBIT_HOLDS points tests at their own file.
@@ -92,7 +95,27 @@ def _duffel(method, path, body=None):
     return data["data"]
 
 
-def _duffel_hold(origin, dest, date, airline):
+def _traveller(ctx):
+    """The signed-in user's profile from this request's _meta, as Duffel's passenger fields, or None."""
+    meta = ctx and ctx.request_context.meta  # no ctx: called directly (tests), not over MCP
+    p = (meta.model_extra or {}).get("traveller") if meta else None
+    if not p:
+        return None
+    return {"given_name": p["first_name"], "family_name": p["last_name"], "born_on": p["born_on"], "title": p["title"],
+            "gender": p["gender"], "email": p["email"], "phone_number": p["phone"]}
+
+
+def _checkout(link):
+    """The store's page for one product, as close to its checkout as a link gets: Amazon's add-to-cart page when the
+    product has an ASIN, else the product page. Stores have no API to fill your address in; their own account does."""
+    u = urlsplit(link)
+    asin = re.search(r"/(?:dp|gp/product)/([A-Z0-9]{10})", u.path)
+    if "amazon." in u.netloc and asin:
+        return f"https://{u.netloc}/gp/aws/cart/add.html?{urlencode({'ASIN.1': asin[1], 'Quantity.1': 1})}"
+    return link
+
+
+def _duffel_hold(origin, dest, date, airline, traveller=None):
     """A real Duffel hold order (test mode): the cheapest fare that can be held, the same airline if it's there."""
     request = _duffel("POST", "/air/offer_requests?return_offers=true", {"data": {
         "slices": [{"origin": origin, "destination": dest, "departure_date": date}],
@@ -108,7 +131,7 @@ def _duffel_hold(origin, dest, date, airline):
         try:
             order = _duffel("POST", "/air/orders", {"data": {
                 "type": "hold", "selected_offers": [offer["id"]],
-                "passengers": [{"id": p["id"], **TEST_TRAVELLER} for p in offer["passengers"]]}})
+                "passengers": [{"id": p["id"], **(traveller or TEST_TRAVELLER)} for p in offer["passengers"]]}})
             break
         except ValueError as e:
             if "offer_no_longer_available" not in str(e) and "price_changed" not in str(e):
@@ -124,7 +147,9 @@ def _duffel_hold(origin, dest, date, airline):
         "origin": origin, "dest": dest, "date": date, "total_amount": order["total_amount"],
         "total_currency": order["total_currency"], "departing_at": legs[0].get("departing_at"),
         "arriving_at": legs[-1].get("arriving_at"),
-        "flight": f"{carrier.get('iata_code', '')}{legs[0].get('marketing_carrier_flight_number', '')}"},
+        "flight": f"{carrier.get('iata_code', '')}{legs[0].get('marketing_carrier_flight_number', '')}",
+        "passenger": f"{(traveller or TEST_TRAVELLER)['given_name']} {(traveller or TEST_TRAVELLER)['family_name']}"
+                     + ("" if traveller else " (sample: add your details in Profile)")},
         currency=order["total_currency"], expires_at=order["payment_status"]["payment_required_by"])
 
 
@@ -141,13 +166,13 @@ def _duffel_pay(h):
 
 
 @mcp.tool(annotations=PREPARE)
-def hold_flight(origin: str, dest: str, date: str, airline: str, depart: str, price: int) -> dict:
+def hold_flight(origin: str, dest: str, date: str, airline: str, depart: str, price: int, ctx: Context = None) -> dict:
     """Hold one flight (an exact fare from search_flights). Free, reversible, nothing is paid.
     date is YYYY-MM-DD, depart is HH:MM, price in whole rupees. With a Duffel test token this is a Duffel hold order
     (its fare and deadline); otherwise a 30-minute sandbox hold at the given price."""
     day = Date.fromisoformat(date)
     if _duffel_token():
-        return _duffel_hold(origin.upper(), dest.upper(), date, airline)
+        return _duffel_hold(origin.upper(), dest.upper(), date, airline, _traveller(ctx))
     summary = f"{airline} {origin.upper()}→{dest.upper()} {day:%a %d %b} {depart}"
     return _hold("flight", summary, _price(price, "price"),
                  {"origin": origin.upper(), "dest": dest.upper(), "date": date, "airline": airline, "depart": depart})
@@ -163,14 +188,17 @@ def hold_stay(city: str, check_in: str, check_out: str, hotel: str, per_night: i
     amount = _price(per_night, "per_night") * nights
     summary = f"{hotel}, {city} · {nights} night{'s' if nights > 1 else ''} from {Date.fromisoformat(check_in):%a %d %b}"
     return _hold("stay", summary, amount,
-                 {"city": city, "check_in": check_in, "check_out": check_out, "hotel": hotel, "per_night": per_night})
+                 {"city": city, "check_in": check_in, "check_out": check_out, "hotel": hotel, "per_night": per_night,
+                  "store": "Booking.com", "checkout": "https://www.booking.com/searchresults.html?" + urlencode(
+                      {"ss": f"{hotel}, {city}", "checkin": check_in, "checkout": check_out, "group_adults": 1,
+                       "no_rooms": 1, "group_children": 0})})
 
 
 @mcp.tool(annotations=PREPARE)
 def hold_order(item: str, store: str, price: int, link: str = "") -> dict:
     """Put one product (an exact offer from check_price) in a cart for 30 minutes. Free, reversible, nothing is paid."""
     return _hold("order", f"{item[:80]} from {store}", _price(price, "price"),
-                 {"item": item[:200], "store": store, "link": link[:500]})
+                 {"item": item[:200], "store": store, "link": link[:500], "checkout": _checkout(link[:500])})
 
 
 @mcp.tool(annotations=PREPARE)
@@ -217,7 +245,8 @@ def confirm_hold(hold_id: str) -> dict:
         return {"hold_id": hold_id, **h}
     h.update(status="confirmed", reference=f"ORB-{secrets.token_hex(3).upper()}",
              confirmed_at=_now().isoformat(timespec="seconds"),
-             payment="Sandbox: nothing was charged. A real provider would open its own checkout here for you to pay.")
+             payment=f"You pay at {h['details']['store']}'s checkout; Orbit never sees your card." if h["details"].get("checkout")
+             else "Sandbox: nothing was charged. A real provider would open its own checkout here for you to pay.")
     _save(holds)
     return {"hold_id": hold_id, **h}
 

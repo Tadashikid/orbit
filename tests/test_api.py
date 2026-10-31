@@ -419,8 +419,8 @@ def test_shopping_cards_link_to_the_store_page_https_only():
     assert (a["store"], a["link"]) == ("Reliance Digital", "https://www.reliancedigital.in/x")
     sneaky = store.add_action("shop@x.com", "s1", hold | {"details": {"store": "X", "link": "javascript:alert(1)"}})
     assert "link" not in sneaky  # only a real web page becomes a button
-    stay = store.add_action("shop@x.com", "s1", hold | {"kind": "stay"})
-    assert "link" not in stay
+    flight = store.add_action("shop@x.com", "s1", hold | {"kind": "flight"})
+    assert "link" not in flight  # a flight's checkout is the card itself (Duffel)
 
 
 def _second_account(monkeypatch, email="someone@gmail.com"):
@@ -460,3 +460,36 @@ def test_delete_my_data_clears_everything_and_signs_out(client, monkeypatch):
     assert again.get("/statement").json() is None  # the statement is gone too
     client.post("/servers/finance/plug")
     assert client.get("/statement").json()["balance"] == STATEMENT_BALANCE  # nobody else's data was touched
+
+
+def test_your_profile_is_encrypted_and_only_sent_to_hold_a_flight(client, monkeypatch):
+    import asyncio
+
+    import store
+    from cryptography.fernet import Fernet
+
+    me = {"first_name": "Asha", "last_name": "Rao", "title": "ms", "gender": "f", "born_on": "1999-02-03",
+          "email": "asha@example.com", "phone": "+919876543210", "address": "12 MG Road", "city": "Bengaluru",
+          "state": "Karnataka", "pincode": "560001", "country": "India"}
+    monkeypatch.setattr(main.google_link, "KEY", "")
+    assert client.post("/me/profile", json=me).status_code == 503  # no key: never kept in plain text
+    monkeypatch.setattr(main.google_link, "KEY", Fernet.generate_key().decode())
+    assert client.get("/me/profile").json() == {"profile": None, "ready": True, "email": main.DEMO_EMAIL}
+    assert client.post("/me/profile", json={**me, "phone": "98765"}).status_code == 422  # needs +country code
+    assert client.post("/me/profile", json={**me, "born_on": "2999-01-01"}).status_code == 422
+    assert client.post("/me/profile", json=me).json()["profile"] == me
+    assert "Asha" not in store.secret(main.DEMO_EMAIL, "profile")  # encrypted at rest
+    assert client.get("/me/profile").json()["profile"] == me
+
+    sent, real = [], main.Registry.call
+
+    async def spy(self, name, args=None, meta=None):
+        sent.append((name, meta))
+        return await real(self, name, args, meta)
+
+    monkeypatch.setattr(main.Registry, "call", spy)
+    client.post("/ask", json=Q)
+    assert all("traveller" not in (m or {}) for _, m in sent)  # reads never see it
+    asyncio.run(main._read(main.DEMO_EMAIL, "booking__hold_flight", {"origin": "BLR", "dest": "GOI", "date": "2026-11-07",
+                                                                     "airline": "IndiGo", "depart": "21:00", "price": 6411}))
+    assert sent[-1] == ("booking__hold_flight", {"traveller": me})

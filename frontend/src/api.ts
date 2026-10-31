@@ -45,6 +45,26 @@ export interface GoogleStatus {
   connected: boolean;
   email: string | null;
 }
+// Your checkout details (Profile): flights are held in this name; shop and hotel cards show the rest to copy.
+export interface Profile {
+  first_name: string;
+  last_name: string;
+  title: string; // mr | ms | mrs | miss | dr
+  gender: string; // m | f
+  born_on: string; // YYYY-MM-DD
+  email: string;
+  phone: string; // +919876543210
+  address: string;
+  city: string;
+  state: string;
+  pincode: string;
+  country: string;
+}
+export interface ProfileStatus {
+  profile: Profile | null;
+  ready: boolean; // the backend can keep it encrypted (ORBIT_TOKEN_KEY)
+  email: string; // who is signed in: the form's default email
+}
 export interface OrbitApi {
   // `onStep` gets a short, human line for each step the agent takes, as it happens.
   decide(question: string, servers: Server[], onStep?: (step: string) => void): Promise<DecisionResult>;
@@ -59,6 +79,8 @@ export interface OrbitApi {
   // Your own Google Calendar + Gmail, read-only: connecting is a page visit to /api/google/connect (Google's screen).
   googleStatus(): Promise<GoogleStatus>;
   disconnectGoogle(): Promise<GoogleStatus>;
+  profile(): Promise<ProfileStatus>;
+  saveProfile(p: Profile): Promise<ProfileStatus>;
   // Holds the agent prepared: you confirm (sending back the version you saw) or let them go.
   approve(action: Approval): Promise<Approval>;
   decline(action: Approval): Promise<Approval>;
@@ -312,6 +334,12 @@ export const api: OrbitApi = {
   },
   async googleStatus() {
     return call<GoogleStatus>("/google/status");
+  },
+  async profile() {
+    return call<ProfileStatus>("/me/profile");
+  },
+  async saveProfile(p) {
+    return call<ProfileStatus>("/me/profile", p);
   },
   async disconnectGoogle() {
     return call<GoogleStatus>("/google/disconnect", {});

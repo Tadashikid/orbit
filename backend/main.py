@@ -9,6 +9,7 @@ GET  /actions                          -> every booking the agent prepared, newe
 POST /actions/{id}/approve {"hash"}    -> confirm a hold the agent prepared (sandbox: nothing is charged)
 POST /actions/{id}/decline             -> let it go
 POST /me/delete                        -> delete my data: conversations, bookings, statement, Google link, my account
+GET  /me/profile, POST /me/profile     -> your checkout details (encrypted): flights are held in your name
 GET  /google/connect, /google/callback -> link your own Google Calendar + Gmail, read-only (backend/google_link.py)
 GET  /google/status, POST /google/disconnect
 POST /ask {"question", "session_id"?}  -> {"verdict", "explanation", "trace", "planner", "model", "offline", "session_id"}
@@ -38,6 +39,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from cryptography.fernet import Fernet, InvalidToken
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
@@ -229,6 +231,9 @@ async def _read(owner, name, args=None, reg=None):
     server, meta = name.partition("__")[0], {}
     if server == "finance" and owner:
         meta["owner"] = owner
+    if name == "booking__hold_flight" and owner:  # the airline needs the passenger's name: yours, from Profile
+        profile = await asyncio.to_thread(_profile, owner)
+        meta |= {"traveller": profile} if profile else {}
     if server in ("calendar", "gmail") and owner:
         token = await asyncio.to_thread(google_link.access_token, owner)
         meta |= {"google_token": token} if token else {}
@@ -358,6 +363,50 @@ async def delete_me(request: Request, response: Response):
                                        "guardian": "requested by you", "error": None}])
     response.delete_cookie(COOKIE)
     return {"deleted": True}
+
+
+class Profile(BaseModel):
+    """What you'd type at every checkout, typed once. Flights are held in this name; booking cards show the rest."""
+    first_name: str = Field(min_length=1, max_length=60)
+    last_name: str = Field(min_length=1, max_length=60)
+    title: str = Field(pattern=r"^(mr|ms|mrs|miss|dr)$")
+    gender: str = Field(pattern=r"^[mf]$")  # what airlines ask for
+    born_on: date
+    email: str = Field(pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$", max_length=120)
+    phone: str = Field(pattern=r"^\+[1-9]\d{7,14}$")  # with the country code: +91...
+    address: str = Field("", max_length=200)
+    city: str = Field("", max_length=60)
+    state: str = Field("", max_length=60)
+    pincode: str = Field("", pattern=r"^[0-9A-Za-z -]{0,10}$")
+    country: str = Field("India", max_length=60)
+
+
+def _profile(owner):
+    """`owner`'s saved details, or None. Kept encrypted with ORBIT_TOKEN_KEY, like the Google token."""
+    blob = store.secret(owner, "profile")
+    if not blob or not google_link.KEY:
+        return None
+    try:
+        return json.loads(Fernet(google_link.KEY).decrypt(blob.encode()))
+    except InvalidToken:  # the key changed: fill it in again
+        return None
+
+
+@app.get("/me/profile")
+def get_profile(request: Request):
+    me = _user(request)
+    return {"profile": _profile(me), "ready": bool(google_link.KEY), "email": me}
+
+
+@app.post("/me/profile")
+def save_profile(body: Profile, request: Request):
+    if not google_link.KEY:
+        raise HTTPException(503, "Set ORBIT_TOKEN_KEY in .env first: your details are kept encrypted with it")
+    if not date(1900, 1, 1) < body.born_on < TODAY:
+        raise HTTPException(422, "Date of birth must be a real date in the past")
+    profile = body.model_dump(mode="json")
+    store.save_secret(_user(request), "profile", Fernet(google_link.KEY).encrypt(json.dumps(profile).encode()).decode())
+    return {"profile": profile, "ready": True, "email": _user(request)}
 
 
 def _key(name, args):

@@ -2848,3 +2848,47 @@
   font-size: 14px;
   color: var(--on-paper-secondary);
 }
+.profile-form {
+  display: grid;
+  gap: 16px;
+}
+.profile-form p {
+  margin: 0;
+  color: var(--on-paper-secondary);
+}
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+.profile-grid label {
+  display: grid;
+  gap: 6px;
+  font-weight: 600;
+}
+.profile-grid input,
+.profile-grid select {
+  font: inherit;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--forest-800) 45%, transparent);
+  border-radius: 10px;
+  background: #fffaf0;
+  color: var(--on-paper-primary);
+}
+.profile-grid input:focus-visible,
+.profile-grid select:focus-visible {
+  outline: 3px solid var(--forest-600);
+  outline-offset: 2px;
+}
+.approval-details {
+  display: grid;
+  gap: 2px;
+}
+button.approval-store {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}

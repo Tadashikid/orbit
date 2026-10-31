@@ -152,7 +152,8 @@ export interface Approval {
   expires_at: string;
   hash: string; // the version you saw; approving sends it back
   store?: string; // shopping orders: where to buy it, and its page (https only)
-  link?: string;
+  link?: string; // shop and hotel cards: the store's checkout page
+  passenger?: string; // flights: whose name the airline holds it in (your Profile)
   status: "pending" | "approving" | "confirmed" | "declined" | "expired" | "failed";
   outcome?: { reference?: string; payment?: string; error?: string; notice?: string }; // notice: the confirmation email
 }

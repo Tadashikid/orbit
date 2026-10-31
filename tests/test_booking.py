@@ -168,3 +168,25 @@ def test_declining_a_duffel_hold_cancels_it_with_duffel(duffel, monkeypatch):
                          ("/air/order_cancellations/ore_1/actions/confirm", None)]
     with pytest.raises(ValueError):
         b.confirm_hold(h["hold_id"])  # a released hold can't be paid any more
+
+
+def test_the_flight_is_held_in_your_name_from_profile(duffel):
+    calls, _ = duffel
+    me = {"first_name": "Asha", "last_name": "Rao", "title": "ms", "gender": "f", "born_on": "1999-02-03",
+          "email": "asha@example.com", "phone": "+919876543210"}
+    ctx = type("C", (), {"request_context": type("R", (), {"meta": type("M", (), {"model_extra": {"traveller": me}})})})
+    h = b.hold_flight("BLR", "GOI", "2026-11-07", "Duffel Airways", "21:00", 6411, ctx)
+    assert calls[1][2]["data"]["passengers"] == [{"id": "pas_1", "given_name": "Asha", "family_name": "Rao",
+                                                  "born_on": "1999-02-03", "title": "ms", "gender": "f",
+                                                  "email": "asha@example.com", "phone_number": "+919876543210"}]
+    assert h["details"]["passenger"] == "Asha Rao"
+    assert "add your details" in b.hold_flight("BLR", "GOI", "2026-11-07", "Duffel Airways", "21:00", 6411)["details"]["passenger"]
+
+
+def test_shopping_and_hotels_land_on_the_stores_checkout():
+    o = b.hold_order("Echo Dot", "Amazon.in", 4499, "https://www.amazon.in/Echo-Dot/dp/B09B8XJDW5?ref=x")
+    assert o["details"]["checkout"] == "https://www.amazon.in/gp/aws/cart/add.html?ASIN.1=B09B8XJDW5&Quantity.1=1"
+    assert b.hold_order("Kettle", "Croma", 999, "https://www.croma.com/p/1")["details"]["checkout"] == "https://www.croma.com/p/1"
+    s = b.hold_stay("Goa", "2026-11-07", "2026-11-09", "Vibes Inn", 791)["details"]
+    assert s["store"] == "Booking.com" and "checkin=2026-11-07&checkout=2026-11-09" in s["checkout"]
+    assert "Amazon.in's checkout" in b.confirm_hold(o["hold_id"])["payment"]
